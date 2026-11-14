@@ -13,6 +13,7 @@ export function Hud() {
       <TopBar />
       <ZoneBanner />
       <Prompt />
+      <Caption />
       <PollyBubble />
       <Toasts />
     </>
@@ -59,16 +60,17 @@ function TopBar() {
 
 function ZoneBanner() {
   const zone = useGame((s) => s.zone);
+  const scene = useGame((s) => s.scene);
   const [shown, setShown] = useState<string | null>(null);
   useEffect(() => {
-    setShown(zone);
+    setShown(scene === 'casino' ? 'inside' : zone);
     const t = setTimeout(() => setShown(null), 2600);
     return () => clearTimeout(t);
-  }, [zone]);
+  }, [zone, scene]);
   if (!shown) return null;
   return (
-    <div className={`zone-banner z-${shown}`} key={shown}>
-      {ZONE_NAMES[shown]}
+    <div className={`zone-banner z-${shown === 'inside' ? 'casino' : shown}`} key={shown}>
+      {shown === 'inside' ? 'Inside the Grand Casino' : ZONE_NAMES[shown]}
     </div>
   );
 }
@@ -85,14 +87,24 @@ function useNear() {
 
 function Prompt() {
   const near = useNear();
-  const blocked = useGame((s) => s.game != null || s.panel != null);
+  const blocked = useGame((s) => s.game != null || s.panel != null || s.doorway != null || s.cinematic != null);
   if (!near || blocked) return null;
-  const verb: Record<string, string> = { game: 'Play', travel: 'Fast travel', daily: 'Open', chest: 'Unlock', wardrobe: 'Open', board: 'Read', cashier: 'Visit' };
+  const verb: Record<string, string> = { game: 'Play', travel: 'Fast travel', daily: 'Open', chest: 'Unlock', wardrobe: 'Open', board: 'Read', cashier: 'Visit', enter: 'Enter the', exit: '', fun: '' };
   return (
     <button className="prompt" onClick={() => handleInteract(near)}>
       <span>{verb[near.kind]}</span> <b>{near.label}</b>
       <kbd>E</kbd>
     </button>
+  );
+}
+
+function Caption() {
+  const caption = useGame((s) => s.cinematic);
+  if (!caption) return null;
+  return (
+    <div className="caption" key={caption}>
+      {caption}
+    </div>
   );
 }
 

@@ -29,7 +29,7 @@ API_PROXY=http://localhost:5013 npm run dev   # point the proxy at another API p
 | Harbour (spawn) | 1 | Daily chest (+20 XP, +1 key), Wardrobe, Notice board, Cashier (history), lighthouse, pier |
 | Boardwalk | 1 | Coconut Shy, Cup Shuffle, Scratch Kiosk |
 | Fairground | 1 | Prize Wheel, Duck Pond, High Striker, ferris wheel |
-| Grand Casino | 2 | Roulette (European, single zero) |
+| Grand Casino | 2 | Walk up the red carpet: an entrance overlay, then the casino's own interior map with two roulette tables (European, single zero), the bar, a slot lounge (decor), the VIP lounge and an exit arch back out |
 | Jungle Ruins | 3 | Temple Doors, hidden treasure chest (1 key → a cosmetic) |
 | Volcano Summit | 4 | Lava Crash |
 
@@ -38,8 +38,15 @@ API_PROXY=http://localhost:5013 npm run dev   # point the proxy at another API p
 - **Cosmetics:** unlocked by level, or found in the chest. They never change the odds.
 - **Movement:** tap to walk (A* pathfinding), or WASD / arrow keys. The camera follows the player; pinch or scroll to
   zoom. Walk up to a stall and tap the button (or press E).
-- **Fast travel:** use any zone's signpost.
+- **Fast travel:** use any zone's signpost (from inside the casino too).
+- **Maps:** the island (`src/world/map.ts`) and the casino interior (`src/world/interior.ts`, art in `casinoArt.ts`).
+  Doorways (spots of kind `enter` / `exit`) fire when you walk up to them. They stay quiet after you step back or
+  arrive next to one, until you walk away.
 - **Locked zones:** fogged and fenced off.
+- **Landmark shows** (free, cosmetic, no money involved): walk up to or tap the Ferris wheel (ride a full turn with a
+  zoomed-out view of the island and fireworks at the top), the lighthouse (dusk falls and the beam sweeps), the volcano
+  (an eruption with lava bombs) or the temple (a light beam and fireflies). Tap a palm for a falling coconut, balloons to
+  let them go, or a boat for a horn blast and a lap. Gulls fly over and fish jump. Effects live in `src/world/fun.ts`.
 
 ## Maths (server-side, `IslandRules`)
 
@@ -98,6 +105,8 @@ npm run build          # type-check + bundle (≈180 KB gzip)
 npm run rtp            # paytable maths
 node tools/play.mjs http://localhost:5197/ shots     # plays every game through the UI, screenshots (needs the API)
 node tools/thumbnail.mjs                             # public/thumbnail.png for the lobby (demo mode)
+node tools/casino.mjs                                # walk into the Grand Casino and back out, screenshots (demo mode)
+node tools/fun.mjs                                   # every landmark show and tap toy, screenshots (demo mode)
 ```
 
 ## Not built yet (from the spec)

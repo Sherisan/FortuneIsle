@@ -2,13 +2,14 @@
 
 type Sfx =
   | 'tick' | 'chip' | 'open' | 'close' | 'error' | 'win' | 'smallwin' | 'bigwin' | 'lose' | 'level' | 'squawk'
-  | 'whoosh' | 'thud' | 'pop' | 'spin' | 'ding' | 'bell' | 'scratch' | 'door' | 'trap' | 'rumble' | 'erupt' | 'step' | 'coin';
+  | 'whoosh' | 'thud' | 'horn' | 'pop' | 'spin' | 'ding' | 'bell' | 'scratch' | 'door' | 'trap' | 'rumble' | 'erupt' | 'step' | 'coin';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = false;
 let ambienceNodes: { stop(): void } | null = null;
 let ambienceWanted = false;
+let ambienceKind: 'island' | 'casino' = 'island';
 
 function ac(): AudioContext | null {
   if (!ctx) {
@@ -76,10 +77,16 @@ export const sound = {
     if (m) {
       ambienceNodes?.stop();
       ambienceNodes = null;
-    } else if (ambienceWanted) this.ambience(true);
+    } else if (ambienceWanted) this.ambience(true, ambienceKind);
   },
-  ambience(on: boolean) {
+  /** Surf and gulls on the island; crowd murmur, chips and a lounge chord inside the casino. */
+  ambience(on: boolean, kind: 'island' | 'casino' = ambienceKind) {
     ambienceWanted = on;
+    if (kind !== ambienceKind) {
+      ambienceKind = kind;
+      ambienceNodes?.stop();
+      ambienceNodes = null;
+    }
     if (!on || muted) {
       ambienceNodes?.stop();
       ambienceNodes = null;
@@ -87,6 +94,42 @@ export const sound = {
     }
     const c = ac();
     if (!c || !master || ambienceNodes) return;
+    if (kind === 'casino') {
+      const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const f = c.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 450;
+      f.Q.value = 0.6;
+      const g = c.createGain();
+      g.gain.value = 0.05;
+      src.connect(f).connect(g).connect(master);
+      src.start();
+      const chords = [[262, 330, 392, 494], [220, 277, 330, 415], [294, 349, 440, 523]];
+      let k = 0;
+      const timer = window.setInterval(() => {
+        const r = Math.random();
+        if (r < 0.45) {
+          tone(1900 + Math.random() * 600, 0.06, { type: 'triangle', vol: 0.025 });
+          tone(2400 + Math.random() * 400, 0.05, { type: 'triangle', vol: 0.02, at: 0.05 });
+        } else if (r < 0.6) {
+          chords[k++ % chords.length].forEach((n, i) => tone(n, 1.6, { type: 'sine', vol: 0.025, at: i * 0.07, attack: 0.05 }));
+        } else if (r < 0.66) {
+          [784, 988, 1175].forEach((n, i) => tone(n, 0.12, { type: 'square', vol: 0.012, at: i * 0.09 }));
+        }
+      }, 1700);
+      ambienceNodes = {
+        stop() {
+          try { src.stop(); } catch { /* already stopped */ }
+          window.clearInterval(timer);
+        },
+      };
+      return;
+    }
     const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
     const d = buf.getChannelData(0);
     let last = 0;
@@ -154,6 +197,7 @@ export const sound = {
       case 'trap': tone(160, 0.5, { type: 'sawtooth', vol: 0.15, slide: 0.4 }); return noise(0.4, { vol: 0.2, freq: 500 });
       case 'rumble': return noise(1.2, { vol: 0.18, freq: 80, q: 1, type: 'lowpass' });
       case 'erupt': noise(1.6, { vol: 0.35, freq: 120, type: 'lowpass' }); return tone(90, 1.2, { type: 'sawtooth', vol: 0.15, slide: 0.4 });
+      case 'horn': tone(147, 0.9, { type: 'sawtooth', vol: 0.09, attack: 0.08 }); return tone(220, 0.9, { type: 'sawtooth', vol: 0.06, attack: 0.08 });
       case 'step': return noise(0.04, { vol: 0.03, freq: 800 });
       case 'coin': return tone(1975, 0.12, { type: 'square', vol: 0.05 });
     }

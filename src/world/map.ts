@@ -14,7 +14,13 @@ export const N = 48;
 export const TW = 96;
 export const TH = 48;
 
-export type Ground = 'deep' | 'water' | 'shallow' | 'sand' | 'grass' | 'meadow' | 'planks' | 'plaza' | 'cobble' | 'jungle' | 'ruin' | 'rock' | 'basalt';
+export type Ground =
+  | 'deep' | 'water' | 'shallow' | 'sand' | 'grass' | 'meadow' | 'planks' | 'plaza' | 'cobble' | 'jungle' | 'ruin' | 'rock' | 'basalt'
+  // Indoors: 'void' is outside the room (not drawn); carpet, marble and the gold stage are floors.
+  | 'void' | 'carpet' | 'marble' | 'stage';
+
+/** Water tiles (the island's sea); 'void' is not water. */
+export const isWaterGround = (g: Ground) => g === 'deep' || g === 'water' || g === 'shallow';
 
 export interface Cell {
   gx: number;
@@ -29,7 +35,18 @@ export interface Cell {
   r: number;
 }
 
-export type SpotKind = 'game' | 'travel' | 'daily' | 'wardrobe' | 'board' | 'cashier' | 'chest';
+/** enter / exit are doorways between maps: walking up to one triggers it. */
+export type SpotKind = 'game' | 'travel' | 'daily' | 'wardrobe' | 'board' | 'cashier' | 'chest' | 'enter' | 'exit' | 'fun';
+
+/** Landmarks you can play with (no money involved): the spot sits on the landmark, the player stands at (ax, ay). */
+export const FUN_LABELS: Record<string, string> = {
+  ferris: 'Ride the Ferris wheel',
+  lighthouse: 'Light the lighthouse',
+  volcano: 'Poke the volcano',
+  temple: 'Touch the temple gem',
+};
+
+export type SceneKey = 'island' | 'casino';
 
 export interface Spot {
   id: string;
@@ -61,6 +78,9 @@ export interface Gate {
 }
 
 export interface WorldMap {
+  kind: SceneKey;
+  /** The playable area in screen coordinates, for the camera. */
+  bounds: { minX: number; maxX: number; minY: number; maxY: number };
   cells: Cell[];
   spots: Spot[];
   props: Prop[];
@@ -132,7 +152,8 @@ const SPOT_DEFS: Record<ZoneKey, { id: string; kind: SpotKind; game?: GameKey; l
     { id: 'sign-fairground', kind: 'travel', label: 'Signpost' },
   ],
   casino: [
-    { id: 'roulette', kind: 'game', game: 'roulette', label: 'Roulette', front: true },
+    // The door: walking in opens the entrance overlay, then the casino's interior map (roulette is inside).
+    { id: 'casino-door', kind: 'enter', label: 'Grand Casino', front: true },
     { id: 'sign-casino', kind: 'travel', label: 'Signpost' },
   ],
   jungle: [
@@ -454,7 +475,31 @@ export function buildMap(): WorldMap {
     }
   }
 
-  return { cells, spots, props, gates, spawn: { gx: CENTERS.harbour[0], gy: CENTERS.harbour[1] + 1 }, centers: CENTERS };
+  // Fun spots on the landmarks: stand on the nearest open tile on the plaza side.
+  for (const p of props) {
+    const label = FUN_LABELS[p.kind];
+    if (!label || !p.zone) continue;
+    const [cx, cy] = CENTERS[p.zone];
+    const f = Math.ceil(p.size ?? 1);
+    let best: [number, number] | null = null;
+    let bd = Infinity;
+    for (let r = f + 1; r <= f + 4 && !best; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const c = at(p.gx + dx, p.gy + dy);
+          if (!c || !c.land || c.blocked || c.zone !== p.zone) continue;
+          const d = Math.hypot(c.gx - cx, c.gy - cy) - (c.path ? 1 : 0);
+          if (d < bd) { bd = d; best = [c.gx, c.gy]; }
+        }
+    if (best) spots.push({ id: `fun-${p.kind}`, kind: 'fun', zone: p.zone, gx: p.gx, gy: p.gy, label, ax: best[0], ay: best[1] });
+  }
+
+  return {
+    kind: 'island',
+    bounds: { minX: -N * (TW / 2), maxX: N * (TW / 2), minY: -200, maxY: N * TH + 100 },
+    cells, spots, props, gates, spawn: { gx: CENTERS.harbour[0], gy: CENTERS.harbour[1] + 1 }, centers: CENTERS,
+  };
 }
 
 // ── Pathfinding ─────────────────────────────────────────────────────────

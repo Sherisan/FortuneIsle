@@ -13,8 +13,25 @@ export const world: { engine: WorldEngine | null; near: Spot | null; listeners: 
 
 export function handleInteract(spot: Spot) {
   const g = useGame.getState();
-  if (g.game || g.panel) return;
+  if (g.game || g.panel || g.doorway) return;
   switch (spot.kind) {
+    case 'enter':
+      useGame.setState({ doorway: 'enter' });
+      break;
+    case 'exit':
+      useGame.setState({ doorway: 'exit' });
+      break;
+    case 'fun': {
+      const started = world.engine?.fun(spot.id);
+      const lines: Record<string, string> = {
+        'fun-ferris': 'All aboard! Hold on to your hat — what a view from up there!',
+        'fun-lighthouse': 'Lights on! The whole island glows at dusk. Squawk!',
+        'fun-volcano': 'You poked the volcano?! Duck!',
+        'fun-temple': 'The gem awakens… ooh, fireflies!',
+      };
+      g.say(started ? lines[spot.id] ?? 'Squawk!' : 'Give it a moment to recover, matey.');
+      break;
+    }
     case 'game':
       g.openGame(spot.game!);
       break;
@@ -74,6 +91,8 @@ export function WorldView() {
         const zone = g.info?.zones.find((x) => x.key === z);
         if (zone) g.say(`The ${zone.name} opens at level ${zone.level}. Keep playing to earn XP!`);
       },
+      onScene: (scene) => useGame.getState().setScene(scene),
+      onCinematic: (caption) => useGame.setState({ cinematic: caption }),
     }).then((e) => {
       if (!alive) return e.destroy();
       engine = e;
@@ -88,9 +107,10 @@ export function WorldView() {
       e.setOpenZones(s.state.player.zones);
       const eq = s.state.player.equipped;
       e.setLook({ hat: eq.hat, outfit: eq.outfit, pet: eq.pet });
-      const paused = s.game != null || s.panel != null || s.phase !== 'play';
+      const paused = s.game != null || s.panel != null || s.doorway != null || s.phase !== 'play';
       e.setPaused(paused);
-      e.focusOn(s.game ? e.spot(s.game) : null);
+      // Focus on the table the player walked up to (the casino has two roulette tables); else the game's own spot.
+      e.focusOn(s.game ? (e.lastSpot?.game === s.game ? e.lastSpot : e.spot(s.game)) : null);
     };
     let last = { zones: '', look: '', paused: '', game: '' };
     const unsub = useGame.subscribe((s) => {
@@ -98,7 +118,7 @@ export function WorldView() {
       const now = {
         zones: s.state.player.zones.join(),
         look: JSON.stringify(s.state.player.equipped),
-        paused: String(s.game != null || s.panel != null || s.phase !== 'play'),
+        paused: String(s.game != null || s.panel != null || s.doorway != null || s.phase !== 'play'),
         game: s.game ?? '',
       };
       if (now.zones !== last.zones || now.look !== last.look || now.paused !== last.paused || now.game !== last.game) {

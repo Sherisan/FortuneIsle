@@ -40,6 +40,13 @@ interface Store {
   shake: number;
   muted: boolean;
   seenZones: ZoneKey[];
+  /** Which map the player is on. */
+  scene: 'island' | 'casino';
+  /** A doorway in progress: the casino's entrance overlay, or the walk back out. */
+  doorway: null | 'enter' | 'exit';
+  /** Caption while a landmark show plays (the Ferris wheel ride, the eruption). */
+  cinematic: string | null;
+  setScene(s: 'island' | 'casino'): void;
 
   boot(): Promise<void>;
   start(): void;
@@ -62,6 +69,7 @@ interface Store {
 }
 
 let ids = 1;
+let seenInside = false;
 
 const readMuted = () => {
   try {
@@ -89,6 +97,17 @@ export const useGame = create<Store>((set, get) => ({
   shake: 0,
   muted: readMuted(),
   seenZones: [],
+  scene: 'island',
+  doorway: null,
+  cinematic: null,
+  setScene(s) {
+    if (get().scene === s) return;
+    const first = s === 'casino' && !seenInside;
+    if (first) seenInside = true;
+    set({ scene: s });
+    sound.ambience(true, s);
+    if (first) get().say('Ooh, fancy! The roulette tables are on the left — and mind the velvet ropes, the VIP lounge is members only.');
+  },
 
   async boot() {
     const { api } = get();
@@ -104,7 +123,7 @@ export const useGame = create<Store>((set, get) => ({
   start() {
     sound.unlock();
     sound.setMuted(get().muted);
-    sound.ambience(true);
+    sound.ambience(true, get().scene);
     set({ phase: 'play' });
     const s = get().state;
     // Disconnect recovery: an unfinished Temple Doors or Lava Crash round reopens its game.
@@ -209,7 +228,7 @@ export const useGame = create<Store>((set, get) => ({
       harbour: 'The Harbour! Grab your daily chest and check the notice board.',
       boardwalk: 'The Boardwalk — Coconut Shy, Cup Shuffle and the Scratch Kiosk. Easy does it!',
       fairground: 'Roll up, roll up! The Fairground has the Prize Wheel, Duck Pond and High Striker.',
-      casino: 'The Grand Casino. Ooh, fancy! European roulette, single zero.',
+      casino: 'The Grand Casino! Walk up the red carpet to the doors to go inside.',
       jungle: 'The Jungle Ruins… mind the traps behind the Temple Doors! There’s a treasure chest hidden somewhere too.',
       volcano: 'Volcano Summit! The lava climbs and climbs — cash out before it erupts!',
     };

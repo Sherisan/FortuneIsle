@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import type { ZoneKey } from '../api/types.ts';
-import { idx, inside, N, TH, TW, toScreen, type Cell, type Ground, type WorldMap } from './map.ts';
+import { idx, inside, isWaterGround, N, TH, TW, toScreen, type Cell, type Ground, type WorldMap } from './map.ts';
 
 /*
  * The ground: water, then a foam rim, then the island's cliff faces and land tiles. Drawn once into 8 × 8-tile chunks
@@ -25,12 +25,20 @@ const COLORS: Record<Ground, [number, number]> = {
   ruin: [0xcac3a5, 0xbdb698],
   rock: [0x7b6868, 0x705e5e],
   basalt: [0x4b3f40, 0x433839],
+  void: [0x1a0f24, 0x1a0f24],
+  carpet: [0x9a2245, 0x92203f],
+  marble: [0xf3ede6, 0xe3d8cc],
+  stage: [0xf2c14e, 0xe8b640],
 };
 
 const FACE_COLOR: Partial<Record<Ground, [number, number]>> = {
   sand: [0xe0b46e, 0xb98a4e],
   rock: [0x544343, 0x3e3131],
   basalt: [0x3a2f30, 0x2b2223],
+  carpet: [0x5a1028, 0x3d0a1b],
+  marble: [0xcfc4b6, 0xa89c8d],
+  stage: [0xc99a2e, 0x9a7420],
+  plaza: [0x5a35a0, 0x3b2066],
   planks: [0x9a6534, 0x7a4f28],
 };
 
@@ -74,6 +82,20 @@ function detail(g: Graphics, c: Cell, x: number, y: number) {
     case 'rock':
       if (r < 0.4) g.ellipse(x + (r - 0.2) * 40, y + 2, 5, 2.5).fill({ color: 0x5b4a4a, alpha: 0.8 });
       break;
+    case 'carpet':
+      // Gold diamond motif on alternate tiles, a dot on the rest.
+      if ((c.gx + c.gy) % 2 === 0) {
+        g.poly(diamond(x, y, 0.36)).stroke({ width: 2, color: 0xf2c14e, alpha: 0.7 });
+        g.poly(diamond(x, y, 0.12)).fill({ color: 0xf2c14e, alpha: 0.8 });
+      } else g.circle(x, y, 2.5).fill({ color: 0xf2c14e, alpha: 0.45 });
+      break;
+    case 'marble':
+      if (r < 0.3) g.moveTo(x - 20, y - 4).quadraticCurveTo(x, y + 6, x + 18, y - 2).stroke({ width: 1.2, color: 0xb9ab9a, alpha: 0.6 });
+      g.poly(diamond(x, y, 1)).stroke({ width: 1, color: 0xc9bba8, alpha: 0.5 });
+      break;
+    case 'stage':
+      g.star(x, y, 5, 18, 8).fill({ color: 0xfff3b0, alpha: 0.9 });
+      break;
     case 'basalt':
       if (r < 0.25) g.moveTo(x - 16, y).lineTo(x - 4, y + 4).lineTo(x + 10, y - 2).stroke({ width: 2, color: 0xff6a2a, alpha: 0.75 });
       break;
@@ -93,7 +115,9 @@ export interface GroundLayers {
 export function buildGround(map: WorldMap): GroundLayers {
   const water = new Container(), foam = new Container(), land = new Container();
   const at = (gx: number, gy: number) => (inside(gx, gy) ? map.cells[idx(gx, gy)] : undefined);
+  // Faces wherever the floor ends; foam only where it meets the sea (not the void around the casino's room).
   const isWater = (gx: number, gy: number) => !at(gx, gy)?.land;
+  const isSea = (gx: number, gy: number) => { const c = at(gx, gy); return !c || (!c.land && isWaterGround(c.ground)); };
 
   for (let cy = 0; cy < N; cy += CHUNK)
     for (let cx = 0; cx < N; cx += CHUNK) {
@@ -104,13 +128,14 @@ export function buildGround(map: WorldMap): GroundLayers {
           const c = map.cells[idx(gx, gy)];
           const { x, y } = toScreen(gx, gy);
           if (!c.land) {
+            if (c.ground === 'void') continue;
             const [a, b] = COLORS[c.ground];
             wg.poly(diamond(x, y, 1.02)).fill(c.r > 0.5 ? a : b);
             if (c.ground === 'shallow') wg.poly(diamond(x, y, 0.6)).fill({ color: 0xffffff, alpha: 0.06 });
             continue;
           }
           // Foam rim around the coast.
-          if (isWater(gx + 1, gy) || isWater(gx - 1, gy) || isWater(gx, gy + 1) || isWater(gx, gy - 1)) {
+          if (isSea(gx + 1, gy) || isSea(gx - 1, gy) || isSea(gx, gy + 1) || isSea(gx, gy - 1)) {
             fg.poly(diamond(x, y + 6, 1.28)).fill({ color: 0xffffff, alpha: 0.85 });
           }
         }
@@ -137,7 +162,7 @@ export function buildGround(map: WorldMap): GroundLayers {
           if (!c.land) continue;
           const { x, y } = toScreen(gx, gy);
           const [a, b] = COLORS[c.ground];
-          const checker = c.ground === 'plaza' || c.ground === 'cobble' || c.ground === 'planks' ? (gx + gy) % 2 === 0 : c.r > 0.5;
+          const checker = c.ground === 'plaza' || c.ground === 'cobble' || c.ground === 'planks' || c.ground === 'marble' ? (gx + gy) % 2 === 0 : c.r > 0.5;
           lg.poly(diamond(x, y, 1.015)).fill(checker ? a : b);
           if (c.path && c.ground !== 'plaza') lg.poly(diamond(x, y, 1)).stroke({ width: 1, color: 0x000000, alpha: 0.07 });
           detail(lg, c, x, y);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { GameOverlay } from './games/GameOverlay.tsx';
 import { useGame } from './store/game.ts';
 import { Celebration } from './ui/Celebration.tsx';
+import { Doorway } from './ui/Doorway.tsx';
 import { Hud } from './ui/Hud.tsx';
 import { Panels } from './ui/Panels.tsx';
 import { RealityCheck } from './ui/RealityCheck.tsx';
@@ -34,6 +35,7 @@ export default function App() {
           <Panels />
           <Celebration />
           <RealityCheck />
+          <Doorway />
         </>
       )}
       {(phase === 'loading' || phase === 'splash' || phase === 'fatal') && <Splash />}

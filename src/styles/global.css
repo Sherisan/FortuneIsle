@@ -119,6 +119,12 @@ input { font: inherit; }
 .prompt kbd { font: 700 12px var(--font); border: 2px solid var(--plum); border-radius: 6px; padding: 1px 6px; background: #fff; }
 @media (pointer: coarse) { .prompt kbd { display: none; } }
 @keyframes pop-in { 0% { opacity: 0; transform: translate(-50%, 20px) scale(.7); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+.caption {
+  position: absolute; left: 50%; bottom: calc(30px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 18; pointer-events: none;
+  font: 700 22px var(--font); color: #fff; padding: 10px 24px; border-radius: 999px; border: 3px solid var(--plum);
+  background: linear-gradient(#b48cff, #7a4fc7); box-shadow: 0 5px 0 var(--plum); text-shadow: 0 2px 0 var(--plum);
+  animation: pop-in .4s cubic-bezier(.3,1.6,.5,1) both; white-space: nowrap;
+}
 .polly { position: absolute; left: 10px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 17; display: flex; align-items: flex-end; gap: 6px; pointer-events: none; }
 .polly .polly-face { filter: drop-shadow(0 4px 0 rgba(44,29,63,.35)); transform-origin: bottom center; }
 .polly.talking .polly-face { animation: bob .5s ease-in-out infinite alternate; }
@@ -235,6 +241,60 @@ table.pay { width: 100%; border-collapse: separate; border-spacing: 0; border: 3
 .pay tfoot td { background: #f4ecff; font-size: 12px; color: var(--plum-2); }
 .rc-big { font-size: 18px; font-weight: 700; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Casino doorway ──────────────────────────────────────────────────── */
+.doorway {
+  position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 70px 14px 16px;
+  background: radial-gradient(ellipse at 50% 30%, rgba(90,53,160,.92), rgba(26,15,36,.97) 70%); animation: fade .35s both; overflow: hidden;
+}
+.doorway::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,226,122,.5) 1px, transparent 2px) 0 0 / 46px 46px; opacity: .35; pointer-events: none; }
+.facade { position: relative; width: min(380px, 84vw); display: flex; flex-direction: column; align-items: center; transition: transform .55s cubic-bezier(.6,0,.8,.4), opacity .55s; transform-origin: 50% 62%; animation: spring .5s cubic-bezier(.3,1.5,.5,1) both; }
+.marquee {
+  position: relative; z-index: 2; padding: 10px 26px; border: 4px solid var(--plum); border-radius: 18px; background: var(--plum); box-shadow: 0 6px 0 #120a1a;
+  font: 700 clamp(24px, 6vw, 32px) var(--font); color: #fff3b0; letter-spacing: 2px; text-shadow: 0 0 10px #ffd23f, 0 0 2px #fff;
+}
+.marquee::before {
+  content: ''; position: absolute; inset: 4px; border-radius: 12px; pointer-events: none;
+  background: radial-gradient(circle, #fff6c2 2.5px, transparent 3.5px) 0 0 / 16px 16px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 4px;
+  animation: bulbs .5s steps(2) infinite;
+}
+@keyframes bulbs { 50% { opacity: .4; } }
+.arch {
+  position: relative; width: 78%; aspect-ratio: 4 / 5; margin-top: -6px; border: 5px solid var(--plum); border-bottom: 0; border-radius: 120px 120px 0 0; overflow: hidden;
+  background: linear-gradient(#f6cf5e, #d89a12); padding: 14px 14px 0; perspective: 900px; box-shadow: inset 0 0 0 4px #fff3b0;
+}
+.door-light { position: absolute; inset: 14px 14px 0; border-radius: 100px 100px 0 0; background: radial-gradient(ellipse at 50% 30%, #fffbe6, #ffd23f 45%, #b8741a 80%); overflow: hidden; }
+.door-light .chand { position: absolute; left: 50%; top: 14%; width: 70px; height: 26px; margin-left: -35px; border-radius: 50%; background: #f2c14e; border: 3px solid var(--plum); box-shadow: 0 0 30px 12px rgba(255,246,194,.9); }
+.door-light::after { content: ''; position: absolute; left: 10%; right: 10%; bottom: 0; height: 30%; background: linear-gradient(transparent, rgba(154,34,69,.8)); clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); }
+.door-l, .door-r {
+  position: absolute; top: 14px; bottom: 0; width: calc(50% - 14px); background: linear-gradient(90deg, #7a2a6e, #9b3a8a 50%, #7a2a6e); border: 3px solid var(--plum);
+  transition: transform .9s cubic-bezier(.4,0,.2,1); box-shadow: inset 0 0 0 6px rgba(242,193,78,.8);
+}
+.door-l { left: 14px; border-radius: 100px 0 0 0; transform-origin: left center; }
+.door-r { right: 14px; border-radius: 0 100px 0 0; transform-origin: right center; }
+.door-l b, .door-r b { position: absolute; top: 55%; width: 10px; height: 34px; border-radius: 6px; background: #f6cf5e; border: 2px solid var(--plum); }
+.door-l b { right: 10px; } .door-r b { left: 10px; }
+.door-l::after, .door-r::after { content: ''; position: absolute; inset: 22% 18% 46%; border: 3px solid rgba(242,193,78,.7); border-radius: 40px 40px 6px 6px; }
+.doorway.open .door-l, .doorway.through .door-l { transform: rotateY(-108deg); }
+.doorway.open .door-r, .doorway.through .door-r { transform: rotateY(108deg); }
+.carpet { width: 92%; height: 34px; background: linear-gradient(#d6203f, #9a1730); border: 4px solid var(--plum); border-top: 0; clip-path: polygon(16% 0, 84% 0, 100% 100%, 0 100%); }
+.door-card { position: relative; width: min(420px, 100%); text-align: center; color: #fff; transition: opacity .3s; }
+.door-card h2 { margin: 0; font: 700 clamp(22px, 5.5vw, 28px) var(--font); color: #ffe27a; text-shadow: 0 3px 0 var(--plum); }
+.door-sub { margin: 4px 0 8px; font-weight: 800; color: #f1e4ff; }
+.door-card ul { list-style: none; margin: 0 0 8px; padding: 0; display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.door-card li { background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.25); border-radius: 12px; padding: 4px 10px; font-weight: 800; font-size: 13px; }
+.door-legal { font-size: 12px; font-weight: 800; color: #d9c8f0; margin: 0 0 12px; }
+.door-legal b { background: var(--coral); color: #fff; border-radius: 6px; padding: 1px 6px; margin-right: 4px; }
+.door-card .row { justify-content: center; }
+.door-card .btn-plain { color: var(--plum); text-shadow: none; }
+.doorway.open .door-card, .doorway.through .door-card { opacity: 0; pointer-events: none; }
+.doorway.through .facade { transform: scale(4.2); opacity: 0; }
+.flash { position: absolute; inset: 0; background: radial-gradient(circle, #fffbe6, #ffd23f); opacity: 0; pointer-events: none; }
+.doorway.through .flash { animation: flash 1s ease both; }
+@keyframes flash { 0% { opacity: 0; } 45% { opacity: 1; } 100% { opacity: 0; } }
+.exit-fade { position: absolute; inset: 0; z-index: 50; display: grid; place-items: center; background: #fff8e0; pointer-events: none; animation: fade .35s both; transition: opacity .4s; }
+.exit-fade.out { opacity: 0; }
+.exit-fade span { font: 700 26px var(--font); color: var(--plum); }
 
 /* ── Win juice ───────────────────────────────────────────────────────── */
 .fx-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 70; pointer-events: none; }

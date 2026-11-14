@@ -14,6 +14,18 @@ const W = 3; // outline width
 export interface Thing {
   view: Container;
   update?: (t: number) => void;
+  /** A tap/interaction: the thing plays its little show (balloons pop, a boat sails off, the gem flares). */
+  poke?: (t: number) => void;
+  /** Where a palm's crown is (for the falling coconut). */
+  top?: { x: number; y: number };
+}
+
+export interface FerrisThing extends Thing {
+  setSpeed(radPerSec: number): void;
+  rot(): number;
+  cabins: Container[];
+  R: number;
+  H: number;
 }
 
 const HW = TW / 2, HH = TH / 2;
@@ -94,7 +106,17 @@ export function palm(seed: number): Thing {
   gloss(f, -3, 2, 3, 2, 0.5);
   top.addChild(f);
   view.addChild(top);
-  return { view, update: (t) => (top.rotation = Math.sin(t * 1.1 + seed * 12) * 0.07) };
+  // Poked: the crown shakes hard for a moment (the engine drops the coconut).
+  let shook = -100;
+  return {
+    view,
+    top: { x: lean, y: -h },
+    update: (t) => {
+      const k = t - shook;
+      top.rotation = Math.sin(t * 1.1 + seed * 12) * 0.07 + (k < 0.8 ? Math.sin(k * 40) * 0.12 * (1 - k / 0.8) : 0);
+    },
+    poke: (t) => (shook = t),
+  };
 }
 
 export function jungleTree(seed: number): Thing {
@@ -270,7 +292,26 @@ export function balloons(seed: number): Thing {
   }
   top.addChild(b);
   view.addChild(g, top);
-  return { view, update: (t) => (top.y = Math.sin(t * 1.6 + seed * 8) * 3) };
+  // Poked: the bunch slips its string and floats away; a fresh bunch is tied on 12 s later.
+  let gone = -100;
+  return {
+    view,
+    update: (t) => {
+      const k = t - gone;
+      if (k < 12) {
+        top.y = -k * 120;
+        top.x = Math.sin(k * 2) * 12;
+        top.alpha = Math.max(0, 1 - k / 3);
+      } else {
+        top.alpha = Math.min(1, k - 12);
+        top.x = 0;
+        top.y = Math.sin(t * 1.6 + seed * 8) * 3;
+      }
+    },
+    poke: (t) => {
+      if (t - gone > 12) gone = t;
+    },
+  };
 }
 
 export function lamp(seed: number, torch = false): Thing {
@@ -307,12 +348,27 @@ export function boat(seed: number): Thing {
   ln(g.poly([-3, -64, -3, -20, -24, -22]).fill(0xfff0d6));
   g.poly([3, -76, 18, -70, 3, -66]).fill(0xffd23f);
   body.addChild(g);
-  view.addChild(body);
+  const wake = new Graphics();
+  wake.ellipse(0, 6, 54, 12).fill({ color: 0xffffff, alpha: 0.45 });
+  wake.alpha = 0;
+  view.addChild(wake, body);
+  // Poked: a lap around its mooring (an ellipse out to sea and back, 7 s) with a white wake.
+  let sail = -100;
   return {
     view,
     update: (t) => {
-      body.y = Math.sin(t * 1.3 + seed * 9) * 3;
-      body.rotation = Math.sin(t * 1.1 + seed * 5) * 0.04;
+      const k = (t - sail) / 7;
+      const lap = k >= 0 && k < 1 ? Math.sin(k * Math.PI) : 0;
+      const a = k * Math.PI * 2;
+      body.x = lap ? Math.sin(a) * 150 : 0;
+      body.y = (lap ? (1 - Math.cos(a)) * 60 : 0) + Math.sin(t * 1.3 + seed * 9) * 3;
+      body.scale.x = lap && Math.cos(a) < 0 ? -1 : 1;
+      body.rotation = Math.sin(t * 1.1 + seed * 5) * (lap ? 0.09 : 0.04);
+      wake.position.set(body.x, body.y);
+      wake.alpha = lap * 0.9;
+    },
+    poke: (t) => {
+      if (t - sail > 7) sail = t;
     },
   };
 }
@@ -354,13 +410,24 @@ export function lighthouse(): Thing {
   ln(g.roundRect(-16, -222, 32, 32, 6).fill(0xfff3b0));
   ln(g.poly([-22, -222, 22, -222, 0, -246]).fill(0xff4f5e));
   const glow = new Graphics();
-  glow.circle(0, -206, 34).fill({ color: 0xfff6c2, alpha: 0.35 });
-  glow.circle(0, -206, 20).fill({ color: 0xffffff, alpha: 0.5 });
+  glow.circle(0, 0, 34).fill({ color: 0xfff6c2, alpha: 0.35 });
+  glow.circle(0, 0, 20).fill({ color: 0xffffff, alpha: 0.5 });
+  glow.position.set(0, -206);
   view.addChild(g, glow);
-  return { view, update: (t) => (glow.alpha = 0.55 + Math.max(0, Math.sin(t * 1.6)) * 0.45) };
+  // Poked (the beacon is lit): the lamp blazes for 14 s.
+  let lit = -100;
+  return {
+    view,
+    update: (t) => {
+      const on = t - lit < 14;
+      glow.alpha = on ? 1 : 0.55 + Math.max(0, Math.sin(t * 1.6)) * 0.45;
+      glow.scale.set(on ? 1.6 + Math.sin(t * 6) * 0.1 : 1);
+    },
+    poke: (t) => (lit = t),
+  };
 }
 
-export function ferris(): Thing {
+export function ferris(): FerrisThing {
   const view = new Container();
   const g = new Graphics();
   shadow(g, 80, 26);
@@ -396,10 +463,20 @@ export function ferris(): Thing {
     cabins.push(c);
   }
   view.addChildAt(wheel, 1);
+  // Rotation is integrated, so the speed can change smoothly (it speeds up while the player rides).
+  let rot = 0, speed = 0.18, target = 0.18, last = -1;
   return {
     view,
+    cabins,
+    R,
+    H,
+    rot: () => rot,
+    setSpeed: (s) => (target = s),
     update: (t) => {
-      const rot = t * 0.18;
+      const dt = last < 0 ? 0 : Math.min(0.1, t - last);
+      last = t;
+      speed += (target - speed) * Math.min(1, dt * 2);
+      rot += speed * dt;
       wheel.rotation = rot;
       cabins.forEach((c, k) => {
         const a = rot + (k / 8) * Math.PI * 2;
@@ -472,8 +549,25 @@ export function temple(): Thing {
   // Gem eye on top
   const gem = new Graphics();
   ln(gem.poly([0, t3.n[1] - 52, 12, t3.n[1] - 38, 0, t3.n[1] - 24, -12, t3.n[1] - 38]).fill(0x3aff9e));
-  view.addChild(g, gem);
-  return { view, update: (t) => (gem.alpha = 0.75 + Math.sin(t * 2) * 0.25) };
+  // Poked: a pillar of green light shoots up from the gem for 9 s.
+  const beam = new Graphics();
+  const gy = t3.n[1] - 38;
+  beam.poly([-14, gy, 14, gy, 40, gy - 900, -40, gy - 900]).fill({ color: 0x3aff9e, alpha: 0.28 });
+  beam.poly([-6, gy, 6, gy, 16, gy - 900, -16, gy - 900]).fill({ color: 0xd9ffe9, alpha: 0.45 });
+  beam.blendMode = 'add';
+  beam.alpha = 0;
+  view.addChild(g, beam, gem);
+  let lit = -100;
+  return {
+    view,
+    update: (t) => {
+      const k = t - lit;
+      const on = k >= 0 && k < 9 ? Math.min(1, k * 2, (9 - k) / 1.5) : 0;
+      beam.alpha = on * (0.8 + Math.sin(t * 8) * 0.2);
+      gem.alpha = on ? 0.85 + Math.sin(t * 14) * 0.15 : 0.75 + Math.sin(t * 2) * 0.25;
+    },
+    poke: (t) => (lit = t),
+  };
 }
 
 export function volcano(seed: number): Thing {
@@ -492,12 +586,24 @@ export function volcano(seed: number): Thing {
   lava.ellipse(0, -265, 18, 4).fill(0xfff1a8);
   view.addChild(g, lava);
   const upd = smoke(view, 0, -280, 6, 2.2, seed, 0x6f6470);
+  // Poked: an eruption. The crater flares; the engine adds the lava bombs and the shake.
+  const flare = new Graphics();
+  flare.ellipse(0, -270, 90, 40).fill({ color: 0xffb347, alpha: 0.5 });
+  flare.ellipse(0, -275, 50, 20).fill({ color: 0xfff1a8, alpha: 0.8 });
+  flare.blendMode = 'add';
+  flare.alpha = 0;
+  view.addChild(flare);
+  let boom = -100;
   return {
     view,
     update: (t) => {
-      lava.alpha = 0.85 + Math.sin(t * 1.8) * 0.15;
-      upd(t);
+      const k = t - boom;
+      const on = k >= 0 && k < 5 ? Math.min(1, (5 - k) / 2) : 0;
+      lava.alpha = on ? 1 : 0.85 + Math.sin(t * 1.8) * 0.15;
+      flare.alpha = on * (0.7 + Math.sin(t * 20) * 0.3);
+      upd(t + (on ? k * 2 : 0));
     },
+    poke: (t) => (boom = t),
   };
 }
 
