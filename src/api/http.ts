@@ -1,4 +1,4 @@
-import { ApiError, type BetBody, type Info, type IslandApi, type LimitsBody, type State } from './types.ts';
+import { ApiError, type BetBody, type Info, type IslandApi, type LimitsBody, type PromoState, type State } from './types.ts';
 
 /*
  * Client for FeedingFranzeeAPI's api/island (Engine `Island`, GameId `fortune-isle`, see IslandController).
@@ -68,5 +68,7 @@ export function createHttpApi(): IslandApi {
     daily: () => call<State>('/api/island/daily', {}),
     chest: () => call<State>('/api/island/chest', {}),
     limits: (body: LimitsBody) => call<State>('/api/island/limits', body),
+    // Promotions for this game (PromoEngine.StateForAsync): live promotions with the player's progress, free plays, awards.
+    promotions: () => call<PromoState>('/api/promotions/state'),
   };
 }

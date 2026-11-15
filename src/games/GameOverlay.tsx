@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { GameKey } from '../api/types.ts';
-import { money, useGame } from '../store/game.ts';
+import { freePlaysIn, money, useGame } from '../store/game.ts';
 import { GAME_ICON } from '../ui/Panels.tsx';
 import { CoconutShy } from './CoconutShy.tsx';
 import { CupShuffle } from './CupShuffle.tsx';
@@ -78,10 +78,46 @@ export function Shell({ game, children, footer, live }: { game: GameKey; childre
   );
 }
 
+/**
+ * The gift toggle: shown when the player has free plays for the open attraction. On, the next round is played with one
+ * (its value is the stake). Roulette shows the value to place on the table.
+ */
+export function FreePlayToggle({ disabled }: { disabled?: boolean }) {
+  const game = useGame((s) => s.game);
+  const useFree = useGame((s) => s.useFree);
+  const setUseFree = useGame((s) => s.setUseFree);
+  const currency = useGame((s) => s.info?.currency ?? 'ZAR');
+  // Select the promotions, not a filtered list: a new array from the selector would re-render forever.
+  const free = freePlaysIn(useGame((s) => s.promos), game);
+  if (!game || free.length === 0) return null;
+  const f = free[0];
+  return (
+    <button
+      className={`free-toggle${useFree ? ' on' : ''}`}
+      disabled={disabled}
+      onClick={() => setUseFree(!useFree)}
+      title={f.promotion ? `From “${f.promotion}”${f.stakeReturned === false ? ' — a win pays what’s above the stake' : ''}` : undefined}
+    >
+      <span className="ft-gift">🎁</span>
+      <span className="ft-text">
+        <b>{useFree ? 'Free play on' : 'Use a free play'}</b>
+        <small>
+          {money(f.amount, currency)}
+          {free.length > 1 ? ` · ${free.length} left` : ''}
+          {game === 'roulette' && useFree ? ' — place exactly this' : ''}
+        </small>
+      </span>
+      <span className={`ft-switch${useFree ? ' on' : ''}`} aria-hidden />
+    </button>
+  );
+}
+
 export function StakePicker({ disabled }: { disabled?: boolean }) {
   const info = useGame((s) => s.info)!;
   const stake = useGame((s) => s.stake);
   const setStake = useGame((s) => s.setStake);
+  const useFree = useGame((s) => s.useFree);
+  const freeValue = useGame((s) => (s.useFree ? s.freePlaysFor(s.game)[0]?.amount : undefined));
   const step = (dir: 1 | -1) => {
     const ladder = [...new Set([info.minBet, ...info.chips, 200, info.maxBet])].filter((v) => v >= info.minBet && v <= info.maxBet).sort((a, b) => a - b);
     const i = ladder.findIndex((v) => v >= stake);
@@ -89,7 +125,9 @@ export function StakePicker({ disabled }: { disabled?: boolean }) {
     setStake(next);
   };
   return (
-    <div className={`stake${disabled ? ' disabled' : ''}`}>
+    <>
+    <FreePlayToggle disabled={disabled} />
+    <div className={`stake${disabled || useFree ? ' disabled' : ''}`}>
       <button className="step" disabled={disabled || stake <= info.minBet} onClick={() => step(-1)} aria-label="Lower stake">−</button>
       <div className="chips">
         {info.chips.map((c) => (
@@ -100,10 +138,11 @@ export function StakePicker({ disabled }: { disabled?: boolean }) {
       </div>
       <button className="step" disabled={disabled || stake >= info.maxBet} onClick={() => step(1)} aria-label="Raise stake">+</button>
       <div className="stake-val">
-        <small>Stake</small>
-        <b>{money(stake, info.currency)}</b>
+        <small>{freeValue != null ? 'Free play' : 'Stake'}</small>
+        <b>{money(freeValue ?? stake, info.currency)}</b>
       </div>
     </div>
+    </>
   );
 }
 
@@ -114,9 +153,15 @@ export const fmtX = (m: number) => `×${Math.round(m * 100) / 100}`;
  * The result line under a stage. text is the hint shown before a round. A return below the stake is never dressed up as
  * a win: it reads "back", in a neutral colour, with no celebration (store.finish does the same).
  */
-export function Result({ round, text }: { round: { payout: number; multiplier: number; stake?: number } | null; text?: string }) {
+export function Result({ round, text }: { round: { payout: number; multiplier: number; stake?: number; free?: boolean } | null; text?: string }) {
   const currency = useGame((s) => s.info?.currency ?? 'ZAR');
   if (!round) return <div className="result idle">{text ?? ' '}</div>;
+  // A free play: the payout is what the promotion paid (the whole return, or what's above the stake).
+  if (round.free) {
+    return round.payout > 0
+      ? <div className="result win">🎁 Free play wins <b>{money(round.payout, currency)}</b> <span>{fmtX(round.multiplier)}</span></div>
+      : <div className="result lose">🎁 Free play — no win this time</div>;
+  }
   if (round.payout <= 0) return <div className="result lose">No win this time</div>;
   if (round.multiplier < 1) return <div className="result back">{money(round.payout, currency)} back <span>{fmtX(round.multiplier)}</span></div>;
   if (round.multiplier === 1) return <div className="result back">Stake back <span>×1</span></div>;

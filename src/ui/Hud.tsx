@@ -28,6 +28,8 @@ function TopBar() {
   const setPanel = useGame((s) => s.setPanel);
   const toggleMute = useGame((s) => s.toggleMute);
   const demo = useGame((s) => s.api.demo);
+  const freePlays = useGame((s) => s.promos?.freeBets.length ?? 0);
+  const livePromos = useGame((s) => s.promos?.promotions.length ?? 0);
   if (!p) return null;
   const pct = Math.max(0, Math.min(1, (p.xp - p.levelXp) / Math.max(1, p.nextXp - p.levelXp)));
   return (
@@ -50,6 +52,11 @@ function TopBar() {
         {demo && <em>DEMO</em>}
       </div>
       <div className="top-actions">
+        {(livePromos > 0 || freePlays > 0) && (
+          <button className="icon-btn gift" onClick={() => setPanel('promos')} title={freePlays ? `Promotions — ${freePlays} free play${freePlays > 1 ? 's' : ''}` : 'Promotions'}>
+            🎁{freePlays > 0 && <span className="badge">{freePlays}</span>}
+          </button>
+        )}
         <button className="icon-btn rg" onClick={() => setPanel('rg')} title="Responsible gambling">🛡️</button>
         <button className="icon-btn" onClick={toggleMute} title={muted ? 'Sound on' : 'Sound off'}>{muted ? '🔇' : '🔊'}</button>
         <button className="icon-btn" onClick={() => setPanel('menu')} title="Menu">☰</button>

@@ -3,7 +3,7 @@ import { colorOf } from '../api/rules.ts';
 import type { RouletteBet, RoundView } from '../api/types.ts';
 import { money, useGame } from '../store/game.ts';
 import { sound } from '../ui/sound.ts';
-import { Result, Shell, wait } from './GameOverlay.tsx';
+import { FreePlayToggle, Result, Shell, wait } from './GameOverlay.tsx';
 
 /** European wheel order, clockwise from zero. */
 const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -45,6 +45,16 @@ export function Roulette() {
   const [last, setLast] = useState<Record<string, { spot: Spot; amount: number }> | null>(null);
   const total = Object.values(bets).reduce((s, b) => s + b.amount, 0);
   const pocket: number | null = round?.outcome?.pocket ?? null;
+  const useFree = useGame((s) => s.useFree);
+  // Promotions that mark numbers on the table: today's lucky number and boosted straight-ups.
+  const promos = useGame((s) => s.promos?.promotions);
+  const lucky = new Set<number>();
+  const boosted = new Map<number, number>();
+  for (const p of promos ?? []) {
+    if (p.subGames.length > 0 && !p.subGames.includes('roulette')) continue;
+    if (p.type === 'LuckyNumber' && p.details?.number != null) lucky.add(p.details.number);
+    if (p.type === 'BoostedPayout') for (const n of p.details?.numbers ?? []) boosted.set(n, p.details.payout);
+  }
 
   const place = (spot: Spot) => {
     if (spinning) return;
@@ -93,9 +103,13 @@ export function Roulette() {
   const cell = (spot: Spot, cls = '') => {
     const b = bets[spot.key];
     const won = pocket != null && last?.[spot.key] && spot.numbers.includes(pocket);
+    const n = spot.type === 'straight' ? spot.numbers[0] : null;
+    const tag = n == null ? null : lucky.has(n) ? 'lucky' : boosted.has(n) ? 'boost' : null;
+    const title = n == null ? undefined : lucky.has(n) ? 'Lucky number — a straight-up win pays a promotion prize' : boosted.has(n) ? `Boosted — a straight-up win pays ${boosted.get(n)} to 1` : undefined;
     return (
-      <button key={spot.key} className={`rc ${cls}${won ? ' won' : ''}${pocket != null && spot.type === 'straight' && spot.numbers[0] === pocket ? ' hit' : ''}`} onClick={() => place(spot)} disabled={spinning}>
+      <button key={spot.key} title={title} className={`rc ${cls}${won ? ' won' : ''}${pocket != null && n === pocket ? ' hit' : ''}${tag ? ` promo-${tag}` : ''}`} onClick={() => place(spot)} disabled={spinning}>
         {spot.label}
+        {tag && <i className="promo-mark">{tag === 'lucky' ? '🍀' : '⚡'}</i>}
         {b && <span className="stack">{b.amount}</span>}
       </button>
     );
@@ -108,6 +122,7 @@ export function Roulette() {
       live={spinning}
       footer={
         <div className="roul-foot">
+          <FreePlayToggle disabled={spinning} />
           <div className="chips">
             {info.chips.map((c) => (
               <button key={c} className={`chip c${c}${chip === c ? ' on' : ''}`} onClick={() => setChip(c)} disabled={spinning}>
@@ -119,7 +134,7 @@ export function Roulette() {
             <button className="btn btn-plain" disabled={spinning || !history.length} onClick={undo}>Undo</button>
             <button className="btn btn-plain" disabled={spinning || !total} onClick={() => { setBets({}); setHistory([]); }}>Clear</button>
             <button className="btn btn-plain" disabled={spinning || !last || total > 0} onClick={() => last && setBets(last)}>Rebet</button>
-            <button className="btn btn-gold" disabled={spinning || busy || !total || total > balance} onClick={() => void spin()}>
+            <button className="btn btn-gold" disabled={spinning || busy || !total || (!useFree && total > balance)} onClick={() => void spin()}>
               Spin {total > 0 ? money(total, info.currency) : ''}
             </button>
           </div>

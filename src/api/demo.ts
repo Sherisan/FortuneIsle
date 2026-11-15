@@ -1,5 +1,6 @@
 import * as R from './rules.ts';
-import { ApiError, type BetBody, type GameKey, type HistoryEntry, type IslandApi, type LimitsBody, type RoundView, type State } from './types.ts';
+import { DemoPromos } from './demoPromos.ts';
+import { ApiError, type BetBody, type FreePlay, type GameKey, type HistoryEntry, type IslandApi, type LimitsBody, type RoundView, type State } from './types.ts';
 
 /*
  * Offline demo engine (?demo or VITE_DEMO=1): the same rules as IslandService, played in the browser with
@@ -28,6 +29,9 @@ interface DemoRound extends RoundView {
   picks: { level: number; door: number; trap: number | null }[];
   ended: Promise<void>;
   end: () => void;
+  /** The free play this round uses (promotions pay it), or null. */
+  freePlay: FreePlay | null;
+  golden: boolean;
 }
 
 export function createDemoApi(): IslandApi {
@@ -47,6 +51,23 @@ export function createDemoApi(): IslandApi {
   const limits: State['limits'] = { lossLimit: { value: null, pending: null }, sessionMinutes: { value: null, pending: null }, realityCheckMinutes: 30 };
 
   const level = () => R.levelOf(xp);
+  const promos = new DemoPromos();
+
+  /** The attraction's top result, as IslandService.IsHit has it. */
+  const isHit = (r: DemoRound, m: number) => {
+    if (m <= 0) return false;
+    switch (r.game) {
+      case 'coconut-shy': return m === (r.golden ? Math.max(...R.COCONUT_GOLDEN.map((t) => t.multiplier)) : R.COCONUT_CLASSIC);
+      case 'cup-shuffle': return true;
+      case 'prize-wheel': return m === Math.max(...R.WHEEL);
+      case 'duck-pond': return m === Math.max(...R.DUCK_TABLE.map((t) => t.multiplier));
+      case 'high-striker': return m === Math.max(...R.STRIKER_TABLE.map((t) => t.multiplier));
+      case 'scratch-kiosk': return m === Math.max(...R.SCRATCH_TABLE.map((t) => t.multiplier));
+      case 'temple-doors': return r.level === R.TEMPLE_LEVELS;
+      case 'lava-crash': return m >= 10;
+      case 'roulette': return (r.choice?.bets ?? []).some((b: { type: string; numbers: number[] }) => b.type === 'straight' && b.numbers[0] === r.outcome?.pocket);
+    }
+  };
 
   const addXp = (n: number) => {
     const before = level();
@@ -60,10 +81,11 @@ export function createDemoApi(): IslandApi {
 
   const view = (r: DemoRound | null): RoundView | null => {
     if (!r) return null;
-    const { crash, startedAt, level: lv, picks: _p, ended: _e, end: _n, ...rest } = r;
-    void _p; void _e; void _n;
+    const { crash, startedAt, level: lv, picks: _p, ended: _e, end: _n, freePlay, golden: _g, ...rest } = r;
+    void _p; void _e; void _n; void _g;
     return {
       ...rest,
+      free: freePlay != null,
       temple: r.game === 'temple-doors' ? { level: lv, now: R.templeMultiplier(lv), next: lv < R.TEMPLE_LEVELS ? R.templeMultiplier(lv + 1) : null } : null,
       lava: r.game === 'lava-crash' ? { elapsedMs: Date.now() - startedAt, auto: r.lava?.auto ?? null, crash: r.status === 'live' ? null : crash } : null,
       serverSeed: r.status === 'live' ? null : r.serverSeed,
@@ -90,10 +112,21 @@ export function createDemoApi(): IslandApi {
   const settle = (r: DemoRound, status: RoundView['status'], m: number) => {
     r.status = status;
     r.multiplier = m;
-    r.payout = m > 0 ? Math.min(floor2(r.stake * m), 250000) : 0;
-    balance = Math.round((balance + r.payout) * 100) / 100;
+    const gross = m > 0 ? Math.min(floor2(r.stake * m), 250000) : 0;
+    const credit = (x: number) => (balance = Math.round((balance + x) * 100) / 100);
+    if (r.freePlay) {
+      r.payout = promos.settleFree(r.freePlay, r.id, gross);
+      credit(r.payout);
+    } else {
+      r.payout = gross;
+      credit(gross);
+      session.won += gross;
+      const pocket: number | undefined = r.game === 'roulette' ? r.outcome?.pocket : undefined;
+      const straight: Record<number, number> = {};
+      for (const b of r.choice?.bets ?? []) if (b.type === 'straight') straight[b.numbers[0]] = (straight[b.numbers[0]] ?? 0) + b.amount;
+      r.promos = promos.played({ id: r.id, game: r.game, stake: r.stake, multiplier: m, payout: gross, hit: !!isHit(r, m), pocket, straight }, credit);
+    }
     r.balance = balance;
-    session.won += r.payout;
     const before = level();
     addXp(R.XP_PER_ROUND);
     r.xpGained = R.XP_PER_ROUND;
@@ -201,14 +234,25 @@ export function createDemoApi(): IslandApi {
       if (!meta) return fail('Unknown game.');
       const zone = R.ZONES.find((z) => z.key === meta.zone)!;
       if (level() < zone.level) return fail(`${meta.name} unlocks at level ${zone.level}.`, 'ZONE_LOCKED');
-      const stake = body.game === 'roulette' ? (body.bets ?? []).reduce((s, b) => s + b.amount, 0) : body.stake;
-      if (!(stake >= 1 && stake <= 500)) return fail('The stake must be between 1.00 and 500.00.', 'INVALID_AMOUNT');
-      if (stake > balance) return fail('Insufficient balance.', 'INSUFFICIENT_FUNDS');
-      const lost = session.staked - session.won;
-      if (limits.lossLimit.value != null && lost + stake > limits.lossLimit.value)
-        return fail(`This bet would take you past your session loss limit of ${limits.lossLimit.value.toFixed(2)}.`, 'LOSS_LIMIT');
-      balance = Math.round((balance - stake) * 100) / 100;
-      session.staked += stake;
+      let stake = body.game === 'roulette' ? (body.bets ?? []).reduce((s, b) => s + b.amount, 0) : body.stake;
+      let freePlay: FreePlay | null = null;
+      if (body.freeBet) {
+        freePlay = promos.claim(body.game);
+        if (!freePlay) return fail(`You have no free play for ${meta.name}.`, 'NO_FREE_BET');
+        if (body.game === 'roulette' && stake !== freePlay.amount) {
+          promos.release(freePlay);
+          return fail(`Your free play is worth ${freePlay.amount.toFixed(2)} — place exactly that on the table.`, 'FREE_BET_AMOUNT');
+        }
+        stake = freePlay.amount;
+      } else {
+        if (!(stake >= 1 && stake <= 500)) return fail('The stake must be between 1.00 and 500.00.', 'INVALID_AMOUNT');
+        if (stake > balance) return fail('Insufficient balance.', 'INSUFFICIENT_FUNDS');
+        const lost = session.staked - session.won;
+        if (limits.lossLimit.value != null && lost + stake > limits.lossLimit.value)
+          return fail(`This bet would take you past your session loss limit of ${limits.lossLimit.value.toFixed(2)}.`, 'LOSS_LIMIT');
+        balance = Math.round((balance - stake) * 100) / 100;
+        session.staked += stake;
+      }
       session.rounds++;
       nonce++;
       let end = () => {};
@@ -216,7 +260,7 @@ export function createDemoApi(): IslandApi {
       const r: DemoRound = {
         id: hex(8), game: body.game, stake, choice: null, outcome: null, status: 'live', multiplier: 0, payout: 0, balance,
         winPending: false, xpGained: 0, levelUp: 0, temple: null, lava: null, serverSeed: nextSeed, clientSeed, nonce,
-        crash: 0, startedAt: Date.now(), level: 0, picks: [], ended, end,
+        crash: 0, startedAt: Date.now(), level: 0, picks: [], ended, end, freePlay, golden: body.mode === 'golden', promos: [],
       };
       nextSeed = hex(32);
       open = r;
@@ -290,6 +334,7 @@ export function createDemoApi(): IslandApi {
       else owned.add(left[pick(left.length)].id);
       return state();
     }),
+    promotions: () => lag(() => promos.state()),
     limits: (b: LimitsBody) => lag(() => {
       limits.lossLimit.value = b.lossLimit;
       limits.sessionMinutes.value = b.sessionMinutes;

@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { createDemoApi } from '../api/demo.ts';
 import { createHttpApi } from '../api/http.ts';
-import { ApiError, type BetBody, type GameKey, type GameMeta, type Info, type IslandApi, type State, type ZoneKey } from '../api/types.ts';
+import { ApiError, type BetBody, type FreePlay, type GameKey, type GameMeta, type Info, type IslandApi, type PromoOutcome, type PromoState, type State, type ZoneKey } from '../api/types.ts';
 import { sound } from '../ui/sound.ts';
 
 const demo = import.meta.env.VITE_DEMO === '1' || new URLSearchParams(location.search).has('demo');
 
-export type Panel = null | 'menu' | 'wardrobe' | 'history' | 'rg' | 'fair' | 'board' | 'travel' | 'paytables';
+export type Panel = null | 'menu' | 'wardrobe' | 'history' | 'rg' | 'fair' | 'board' | 'travel' | 'paytables' | 'promos';
 
 export interface Toast {
   id: number;
@@ -48,6 +48,17 @@ interface Store {
   cinematic: string | null;
   setScene(s: 'island' | 'casino'): void;
 
+  /** Promotions for this game (live promotions, the player's free plays, recent rewards); null until loaded. */
+  promos: PromoState | null;
+  /** The player chose to use a free play for the next round of the open game. */
+  useFree: boolean;
+  /** Reloads the promotions. Rewards that weren't already shown (rain, leaderboard prizes, grants…) are toasted;
+   *  skipRound: the round whose rewards finish() just showed. */
+  loadPromos(skipRound?: string): Promise<void>;
+  setUseFree(on: boolean): void;
+  /** Free plays usable at this attraction, soonest to expire first. */
+  freePlaysFor(k: GameKey | null): FreePlay[];
+
   boot(): Promise<void>;
   start(): void;
   /** Calls the API (busy, errors → toast). Applies the state except the balance when holdBalance. */
@@ -70,6 +81,19 @@ interface Store {
 
 let ids = 1;
 let seenInside = false;
+/** Reward ids already shown (or there before the game opened). */
+const seenAwards = new Set<string>();
+let promosLoaded = false;
+
+/** A toast for what a play earned. Progress is only shown when it's news (a new symbol, one play to go). */
+function promoToast(o: PromoOutcome, currency: string): { text: string; kind: Toast['kind'] } | null {
+  if (o.kind === 'Cash') return { text: `🎁 ${o.promotion}: ${o.message} +${money(o.amount, currency)}`, kind: 'win' };
+  if (o.kind === 'FreeBet') return { text: `🎁 ${o.promotion}: ${o.message} You earned a ${money(o.amount, currency)} free play.`, kind: 'win' };
+  if (o.type === 'CollectionMission' && o.progress?.isNew) return { text: `🧭 ${o.message}`, kind: 'info' };
+  if (o.type === 'StreakMission' && o.progress && o.progress.target - o.progress.streak === 1) return { text: `🔥 ${o.promotion}: one more play for the reward!`, kind: 'info' };
+  if (o.type === 'BuyXGetFree' && o.progress && o.progress.buy - o.progress.count === 1) return { text: `🎟️ ${o.promotion}: one more for a free play!`, kind: 'info' };
+  return null;
+}
 
 const readMuted = () => {
   try {
@@ -100,6 +124,42 @@ export const useGame = create<Store>((set, get) => ({
   scene: 'island',
   doorway: null,
   cinematic: null,
+  promos: null,
+  useFree: false,
+
+  async loadPromos(skipRound) {
+    let p: PromoState;
+    try {
+      p = await get().api.promotions();
+    } catch {
+      return; // promotions are extras: the game plays on without them
+    }
+    const currency = get().info?.currency ?? 'ZAR';
+    let cash = false;
+    for (const a of [...p.recentAwards].reverse()) {
+      if (seenAwards.has(a.awardId)) continue;
+      seenAwards.add(a.awardId);
+      if (!promosLoaded || (skipRound && a.roundId === skipRound) || a.reason === 'Free bet win') continue;
+      if (a.kind === 'Cash') {
+        cash = true;
+        get().toast(`🎁 ${a.promotion ?? 'Promotion'}: ${a.reason} +${money(a.amount, currency)}`, 'win');
+        sound.play('coin');
+      } else get().toast(`🎁 ${a.promotion ?? 'Promotion'}: a ${money(a.amount, currency)} free play is yours!`, 'win');
+    }
+    promosLoaded = true;
+    set({ promos: p });
+    if (get().useFree && get().freePlaysFor(get().game).length === 0) set({ useFree: false });
+    // Cash from rain, leaderboards or cashback changes the balance outside a round.
+    if (cash && get().state?.round?.status !== 'live') get().api.balance().then((b) => set({ balance: b })).catch(() => {});
+  },
+  setUseFree(on) {
+    sound.play('tick');
+    set({ useFree: on && get().freePlaysFor(get().game).length > 0 });
+  },
+  freePlaysFor(k) {
+    return freePlaysIn(get().promos, k);
+  },
+
   setScene(s) {
     if (get().scene === s) return;
     const first = s === 'casino' && !seenInside;
@@ -115,6 +175,11 @@ export const useGame = create<Store>((set, get) => ({
       const [info, balance, state] = await Promise.all([api.info(), api.balance(), api.state()]);
       const stake = info.chips.includes(5) ? 5 : info.chips[0] ?? info.minBet;
       set({ info, balance, state, stake, phase: 'splash' });
+      await get().loadPromos();
+      // Rewards while away (rain, leaderboard prizes, cashback) are checked every 30 seconds.
+      setInterval(() => {
+        if (get().phase === 'play' && !document.hidden) void get().loadPromos();
+      }, 30_000);
     } catch (e) {
       set({ phase: 'fatal', fatal: e instanceof Error ? e.message : String(e) });
     }
@@ -134,6 +199,14 @@ export const useGame = create<Store>((set, get) => ({
       get().say('Welcome to Fortune Isle! Tap the ground to walk. The Boardwalk stalls are just up the path →');
     } else {
       get().say('Welcome back, matey! The island missed you.');
+    }
+    const p = get().promos;
+    if (p && (p.promotions.length > 0 || p.freeBets.length > 0) && s?.round?.status !== 'live') {
+      const free = p.freeBets.length;
+      const n = p.promotions.length;
+      setTimeout(() => get().say(free > 0
+        ? `Squawk! You’ve got ${free} free play${free > 1 ? 's' : ''} — tap 🎁 at the top, or the gift by the stake chips.`
+        : `There ${n === 1 ? 'is a promotion' : `are ${n} promotions`} on the island today — tap 🎁 or read the Harbour notice board!`), 5600);
     }
   },
 
@@ -157,10 +230,29 @@ export const useGame = create<Store>((set, get) => ({
   },
 
   async bet(body) {
-    const stake = body.game === 'roulette' ? (body.bets ?? []).reduce((s, b) => s + b.amount, 0) : body.stake;
-    const s = await get().run((api) => api.bet(body), { holdBalance: true });
-    if (!s) return null;
+    // A free play: chosen with the gift toggle, available here, and (roulette) the table adds up to its value.
+    const free = get().useFree ? get().freePlaysFor(body.game)[0] : undefined;
+    if (free && body.game === 'roulette') {
+      const total = (body.bets ?? []).reduce((s, b) => s + b.amount, 0);
+      if (Math.abs(total - free.amount) > 0.001) {
+        get().toast(`Your free play is worth ${money(free.amount, get().info?.currency)} — place exactly that on the table.`, 'info');
+        return null;
+      }
+    }
+    const req = free ? { ...body, freeBet: true } : body;
+    const stake = free ? 0 : body.game === 'roulette' ? (body.bets ?? []).reduce((s, b) => s + b.amount, 0) : body.stake;
+    const s = await get().run((api) => api.bet(req), { holdBalance: true });
+    if (!s) {
+      if (free) void get().loadPromos();
+      return null;
+    }
     sound.play('chip');
+    if (free) {
+      // The free play is used up: drop it now so the toggle and counts update straight away.
+      const promos = get().promos;
+      if (promos) set({ promos: { ...promos, freeBets: promos.freeBets.filter((f) => f.awardId !== free.awardId) } });
+      if (get().freePlaysFor(body.game).length === 0) set({ useFree: false });
+    }
     set({ balance: Math.round((get().balance - stake) * 100) / 100 });
     if (s.round?.status === 'live' && s.round.balance != null) set({ balance: s.round.balance });
     return s;
@@ -186,6 +278,14 @@ export const useGame = create<Store>((set, get) => ({
       if (Math.random() < 0.15) get().say(['Ooh, so close! Polly believes in you.', 'Not this time, matey.', 'The sea gives, the sea takes!'][Math.floor(Math.random() * 3)]);
     }
     if (r.winPending) get().toast('Your win is being credited — it will show in your balance shortly.', 'info');
+    const currency = get().info?.currency ?? 'ZAR';
+    for (const o of r.promos ?? []) {
+      const t = promoToast(o, currency);
+      if (t) get().toast(t.text, t.kind);
+      if (o.kind !== 'Progress') sound.play('coin');
+    }
+    if (r.free) get().toast(r.payout > 0 ? `Free play: ${money(r.payout, currency)} paid by the promotion.` : 'Free play used — better luck next time!', 'info');
+    void get().loadPromos(r.id);
     if (r.levelUp > 0) {
       get().toast(`Level ${s.player.level}! +${r.levelUp} key${r.levelUp > 1 ? 's' : ''}`, 'level');
       sound.play('level');
@@ -201,7 +301,7 @@ export const useGame = create<Store>((set, get) => ({
 
   openGame(k) {
     sound.play('open');
-    set({ game: k, panel: null });
+    set({ game: k, panel: null, useFree: false });
   },
   closeGame() {
     if (get().state?.round?.status === 'live') {
@@ -261,6 +361,12 @@ export const useGame = create<Store>((set, get) => ({
     return get().info?.games.find((g) => g.key === k) as GameMeta<K> | undefined;
   },
 }));
+
+/** Free plays usable at this attraction (empty subGames = anywhere). Pure, so components can call it on selected state. */
+export function freePlaysIn(promos: PromoState | null, k: GameKey | null): FreePlay[] {
+  if (!k) return [];
+  return (promos?.freeBets ?? []).filter((f) => f.subGames.length === 0 || f.subGames.includes(k));
+}
 
 export const money = (n: number, currency = 'ZAR') =>
   (currency === 'ZAR' ? 'R' : `${currency} `) + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

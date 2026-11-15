@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { Cosmetic, GameKey, ZoneKey } from '../api/types.ts';
 import { Paytable } from '../games/Paytable.tsx';
 import { money, useGame, type Panel } from '../store/game.ts';
+import { Promotions } from './Promotions.tsx';
 import { sound } from './sound.ts';
 import { world } from '../world/WorldView.tsx';
 
@@ -27,7 +28,7 @@ export function Panels() {
   };
   const titles: Record<Exclude<Panel, null>, string> = {
     menu: 'Menu', wardrobe: 'Wardrobe', history: 'Cashier & history', rg: 'Responsible gambling', fair: 'Provably fair',
-    board: 'Island notice board', travel: 'Fast travel', paytables: 'Paytables & rules',
+    board: 'Island notice board', travel: 'Fast travel', paytables: 'Paytables & rules', promos: 'Promotions',
   };
   return (
     <div className="sheet-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
@@ -36,7 +37,7 @@ export function Panels() {
           <h2>{titles[panel]}</h2>
           <button className="icon-btn" onClick={close} aria-label="Close">✕</button>
         </header>
-        <div className="sheet-body">
+        <div className="sheet-body" key={panel}>
           {panel === 'menu' && <Menu />}
           {panel === 'wardrobe' && <Wardrobe />}
           {panel === 'history' && <History />}
@@ -45,6 +46,7 @@ export function Panels() {
           {panel === 'board' && <Board />}
           {panel === 'travel' && <Travel />}
           {panel === 'paytables' && <Paytables />}
+          {panel === 'promos' && <Promotions />}
         </div>
       </div>
     </div>
@@ -64,8 +66,10 @@ function Menu() {
       </span>
     </button>
   );
+  const promoCount = useGame((s) => (s.promos?.promotions.length ?? 0) + (s.promos?.freeBets.length ?? 0));
   return (
     <div className="menu-list">
+      {item('🎁', 'Promotions', () => setPanel('promos'), promoCount ? 'Free plays, races, leaderboards and more' : 'Nothing running right now')}
       {item('🧢', 'Wardrobe', () => setPanel('wardrobe'), 'Hats, outfits, pets and win effects')}
       {item('🧾', 'Round history', () => setPanel('history'), 'Your recent rounds and session totals')}
       {item('🗺️', 'Fast travel', () => setPanel('travel'), 'Jump to any open zone')}
@@ -251,6 +255,7 @@ function Board() {
   const setPanel = useGame((s) => s.setPanel);
   return (
     <div className="board">
+      <Promotions compact />
       <p className="hint">Every game is server-decided with a certified RNG. The stake, balance and an info button are in every game.</p>
       {info.zones.filter((z) => z.key !== 'harbour').map((z) => {
         const open = p.level >= z.level;

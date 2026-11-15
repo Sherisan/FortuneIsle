@@ -81,6 +81,8 @@ export interface BetBody {
   mode?: 'classic' | 'golden';
   auto?: number;
   bets?: RouletteBet[];
+  /** Play one of the player's free plays for this attraction (its value is the stake; roulette bets must add up to it). */
+  freeBet?: boolean;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -97,6 +99,10 @@ export interface RoundView {
   winPending: boolean;
   xpGained: number;
   levelUp: number;
+  /** A free play: payout is what the promotion paid. */
+  free?: boolean;
+  /** What this play earned from promotions. */
+  promos?: PromoOutcome[];
   temple: { level: number; now: number; next: number | null } | null;
   lava: { elapsedMs: number; auto: number | null; crash: number | null } | null;
   serverSeed: string | null;
@@ -153,6 +159,67 @@ export interface LimitsBody {
   realityCheckMinutes: number | null;
 }
 
+/* ── Promotions (FeedingFranzeeAPI PromoEngine, GET api/promotions/state) ── */
+
+export type PromoType =
+  | 'FreeBet' | 'Rain' | 'MultiplierLeaderboard' | 'MultiplierRace' | 'Cashback' | 'StreakMission'
+  | 'MysteryPrize' | 'BuyXGetFree' | 'CollectionMission' | 'LuckyNumber' | 'BoostedPayout'
+  | 'RoundDrop' | 'CommunityJackpot' | 'HandBonus' | 'HandJackpot';
+
+/** What a play earned: Cash and FreeBet are already paid / granted; Progress carries streak / collection / buy-X progress. */
+export interface PromoOutcome {
+  promotionId: number;
+  promotion: string;
+  type: PromoType;
+  kind: 'Cash' | 'FreeBet' | 'Progress';
+  amount: number;
+  message: string;
+  progress?: any;
+}
+
+export interface FreePlay {
+  awardId: string;
+  amount: number;
+  expiresAt: string | null;
+  promotion: string | null;
+  /** Roulette: the bet types it may go on (empty = any). */
+  betTypes: string[];
+  /** The attractions it can be played at (empty = all). */
+  subGames: GameKey[];
+  /** True: a win pays the whole return; false: what's above the stake. */
+  stakeReturned?: boolean;
+}
+
+export interface LivePromo {
+  promotionId: number;
+  name: string;
+  type: PromoType;
+  terms: string;
+  minStake: number;
+  endsAt: string | null;
+  /** The attractions it counts in (empty = all). */
+  subGames: GameKey[];
+  details: any;
+}
+
+export interface RecentAward {
+  awardId: string;
+  kind: 'Cash' | 'FreeBet';
+  amount: number;
+  reason: string;
+  createdAt: string;
+  gameId: string;
+  roundId: string | null;
+  promotion: string | null;
+}
+
+export interface PromoState {
+  serverTime: string;
+  promotions: LivePromo[];
+  freeBets: FreePlay[];
+  recentAwards: RecentAward[];
+}
+
 export interface IslandApi {
   readonly demo: boolean;
   info(): Promise<Info>;
@@ -166,6 +233,7 @@ export interface IslandApi {
   daily(): Promise<State>;
   chest(): Promise<State>;
   limits(body: LimitsBody): Promise<State>;
+  promotions(): Promise<PromoState>;
 }
 
 export class ApiError extends Error {
