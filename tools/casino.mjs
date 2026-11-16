@@ -19,7 +19,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shot = (n) => page.screenshot({ path: `${out}/casino-${n}.png` });
 const ev = (js) => page.evaluate(js);
-const doorway = () => ev(`window.__fi.useGame.getState().doorway`);
+const doorway = () => ev(`window.__fi.useGame.getState().doorway?.kind ?? null`);
 
 await page.goto(`${base}?demo&unlock`);
 await page.getByText('Tap to play').click({ timeout: 60000 });
@@ -27,7 +27,7 @@ await sleep(1000);
 
 // Stand 3 tiles from the door and walk to it: the doorway must open by itself.
 await ev(`(() => { const e = window.__fi.world.engine; const d = e.spot('casino-door'); e.enterScene('island', { gx: d.ax + 2, gy: d.ay + 2 }); e.walkTo(d.ax, d.ay); })()`);
-await page.waitForFunction(() => window.__fi.useGame.getState().doorway === 'enter', null, { timeout: 30000 }).catch(() => {});
+await page.waitForFunction(() => window.__fi.useGame.getState().doorway?.kind === 'enter', null, { timeout: 30000 }).catch(() => {});
 await sleep(600);
 console.log('doorway after walking up:', await doorway());
 await shot('1-entrance');
@@ -57,7 +57,7 @@ await sleep(400);
 
 // Walk out through the exit arch.
 await ev(`(() => { const e = window.__fi.world.engine; e.enterScene('casino', { gx: 24, gy: 28 }); e.walkTo(24, 32); })()`);
-await page.waitForFunction(() => window.__fi.useGame.getState().doorway === 'exit', null, { timeout: 30000 }).catch(() => {});
+await page.waitForFunction(() => window.__fi.useGame.getState().doorway?.kind === 'exit', null, { timeout: 30000 }).catch(() => {});
 console.log('doorway at exit:', await doorway());
 await page.waitForFunction(() => window.__fi.useGame.getState().doorway === null, null, { timeout: 20000 }).catch(() => {});
 await sleep(1500);

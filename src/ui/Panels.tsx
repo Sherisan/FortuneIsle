@@ -8,9 +8,11 @@ import { world } from '../world/WorldView.tsx';
 
 export const GAME_ICON: Record<GameKey, string> = {
   'coconut-shy': '🥥', 'cup-shuffle': '🥤', 'scratch-kiosk': '🎟️', 'prize-wheel': '🎡', 'duck-pond': '🦆', 'high-striker': '🔨',
-  roulette: '🎰', 'temple-doors': '🚪', 'lava-crash': '🌋',
+  roulette: '🎰', 'temple-doors': '🚪', 'lava-crash': '🌋', 'island-reels': '🍒', 'dragon-tiger': '🐉', 'pirate-dice': '🎲',
 };
-const ZONE_ICON: Record<ZoneKey, string> = { harbour: '⚓', boardwalk: '🏖️', fairground: '🎪', casino: '🎰', jungle: '🌴', volcano: '🌋' };
+const ZONE_ICON: Record<ZoneKey, string> = { harbour: '⚓', boardwalk: '🏖️', fairground: '🎪', casino: '🎰', jungle: '🌴', volcano: '🌋', vip: '💎' };
+/** Games played indoors: where to find them. */
+const INDOORS: Partial<Record<GameKey, string>> = { roulette: 'inside the casino', 'island-reels': 'inside the casino', 'dragon-tiger': 'inside the casino', 'pirate-dice': 'in the Rusty Anchor tavern' };
 const COSMETIC_ICON: Record<string, string> = {
   'hat-none': '🚫', 'hat-straw': '👒', 'hat-sailor': '⚓', 'hat-pirate': '🏴‍☠️', 'hat-flower': '🌺', 'hat-crown': '👑',
   'outfit-tee': '👕', 'outfit-hawaiian': '🌴', 'outfit-sailor': '🧑‍✈️', 'outfit-tux': '🤵', 'outfit-explorer': '🧭', 'outfit-gold': '✨',
@@ -257,7 +259,7 @@ function Board() {
     <div className="board">
       <Promotions compact />
       <p className="hint">Every game is server-decided with a certified RNG. The stake, balance and an info button are in every game.</p>
-      {info.zones.filter((z) => z.key !== 'harbour').map((z) => {
+      {info.zones.filter((z) => z.key === 'vip' || info.games.some((g) => g.zone === z.key)).map((z) => {
         const open = p.level >= z.level;
         return (
           <section key={z.key} className={open ? '' : 'locked'}>
@@ -267,10 +269,15 @@ function Board() {
             <ul>
               {info.games.filter((g) => g.zone === z.key).map((g) => (
                 <li key={g.key}>
-                  <span>{GAME_ICON[g.key]} {g.name}</span>
+                  <span>{GAME_ICON[g.key]} {g.name} {INDOORS[g.key] && <small>· {INDOORS[g.key]}</small>}</span>
                   <b>RTP {(g.rtp * 100).toFixed(g.key === 'roulette' ? 1 : 0)}%</b>
                 </li>
               ))}
+              {z.key === 'vip' && (
+                <li>
+                  <span>Upstairs in the Grand Casino: golden reels, private roulette and Dragon Tiger — same odds, more sparkle.</span>
+                </li>
+              )}
             </ul>
           </section>
         );

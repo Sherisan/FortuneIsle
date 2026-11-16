@@ -5,7 +5,10 @@ import { PollyFace } from './Polly.tsx';
 
 const ZONE_NAMES: Record<string, string> = {
   harbour: 'The Harbour', boardwalk: 'The Boardwalk', fairground: 'The Fairground', casino: 'Grand Casino', jungle: 'Jungle Ruins', volcano: 'Volcano Summit',
+  vip: 'VIP Salon',
 };
+/** The banner shown on walking into a room. */
+const ROOM_NAMES: Record<string, string> = { casino: 'Inside the Grand Casino', vip: '💎 The VIP Salon', tavern: '⚓ The Rusty Anchor' };
 
 export function Hud() {
   return (
@@ -70,14 +73,14 @@ function ZoneBanner() {
   const scene = useGame((s) => s.scene);
   const [shown, setShown] = useState<string | null>(null);
   useEffect(() => {
-    setShown(scene === 'casino' ? 'inside' : zone);
+    setShown(scene !== 'island' ? `room:${scene}` : zone);
     const t = setTimeout(() => setShown(null), 2600);
     return () => clearTimeout(t);
   }, [zone, scene]);
   if (!shown) return null;
   return (
-    <div className={`zone-banner z-${shown === 'inside' ? 'casino' : shown}`} key={shown}>
-      {shown === 'inside' ? 'Inside the Grand Casino' : ZONE_NAMES[shown]}
+    <div className={`zone-banner z-${shown.replace('room:', '')}`} key={shown}>
+      {shown.startsWith('room:') ? ROOM_NAMES[shown.slice(5)] : ZONE_NAMES[shown]}
     </div>
   );
 }

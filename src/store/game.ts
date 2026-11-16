@@ -3,6 +3,7 @@ import { createDemoApi } from '../api/demo.ts';
 import { createHttpApi } from '../api/http.ts';
 import { ApiError, type BetBody, type FreePlay, type GameKey, type GameMeta, type Info, type IslandApi, type PromoOutcome, type PromoState, type State, type ZoneKey } from '../api/types.ts';
 import { sound } from '../ui/sound.ts';
+import type { SceneKey } from '../world/map.ts';
 
 const demo = import.meta.env.VITE_DEMO === '1' || new URLSearchParams(location.search).has('demo');
 
@@ -41,12 +42,12 @@ interface Store {
   muted: boolean;
   seenZones: ZoneKey[];
   /** Which map the player is on. */
-  scene: 'island' | 'casino';
-  /** A doorway in progress: the casino's entrance overlay, or the walk back out. */
-  doorway: null | 'enter' | 'exit';
+  scene: SceneKey;
+  /** A doorway in progress: a building's entrance overlay going in (to = the room), or the quick fade going out. */
+  doorway: null | { kind: 'enter' | 'exit'; to: SceneKey };
   /** Caption while a landmark show plays (the Ferris wheel ride, the eruption). */
   cinematic: string | null;
-  setScene(s: 'island' | 'casino'): void;
+  setScene(s: SceneKey): void;
 
   /** Promotions for this game (live promotions, the player's free plays, recent rewards); null until loaded. */
   promos: PromoState | null;
@@ -80,7 +81,7 @@ interface Store {
 }
 
 let ids = 1;
-let seenInside = false;
+const seenScenes = new Set<SceneKey>(['island']);
 /** Reward ids already shown (or there before the game opened). */
 const seenAwards = new Set<string>();
 let promosLoaded = false;
@@ -162,11 +163,16 @@ export const useGame = create<Store>((set, get) => ({
 
   setScene(s) {
     if (get().scene === s) return;
-    const first = s === 'casino' && !seenInside;
-    if (first) seenInside = true;
+    const first = !seenScenes.has(s);
+    seenScenes.add(s);
     set({ scene: s });
     sound.ambience(true, s);
-    if (first) get().say('Ooh, fancy! The roulette tables are on the left — and mind the velvet ropes, the VIP lounge is members only.');
+    const lines: Partial<Record<SceneKey, string>> = {
+      casino: 'Ooh, fancy! Roulette on the left, Island Reels under the big screen, Dragon Tiger at the card tables — and the VIP Salon is up the stairs past the ropes.',
+      vip: 'The VIP Salon! Golden reels, a private roulette table and Dragon Tiger. Same fair odds as downstairs — just shinier.',
+      tavern: 'Arr, the Rusty Anchor! Pick a face at the Pirate Dice tables — three of yours pays ×12.36!',
+    };
+    if (first && lines[s]) get().say(lines[s]);
   },
 
   async boot() {
@@ -325,14 +331,15 @@ export const useGame = create<Store>((set, get) => ({
     set({ zone: z, seenZones: first ? [...get().seenZones, z] : get().seenZones });
     if (!first) return;
     const lines: Record<ZoneKey, string> = {
-      harbour: 'The Harbour! Grab your daily chest and check the notice board.',
+      harbour: 'The Harbour! Grab your daily chest, check the notice board — and the Rusty Anchor tavern has Pirate Dice.',
       boardwalk: 'The Boardwalk — Coconut Shy, Cup Shuffle and the Scratch Kiosk. Easy does it!',
       fairground: 'Roll up, roll up! The Fairground has the Prize Wheel, Duck Pond and High Striker.',
       casino: 'The Grand Casino! Walk up the red carpet to the doors to go inside.',
       jungle: 'The Jungle Ruins… mind the traps behind the Temple Doors! There’s a treasure chest hidden somewhere too.',
       volcano: 'Volcano Summit! The lava climbs and climbs — cash out before it erupts!',
+      vip: '', // the room's own greeting (setScene) covers it
     };
-    get().say(lines[z]);
+    if (lines[z]) get().say(lines[z]);
   },
   toast(text, kind = 'info') {
     const id = ids++;

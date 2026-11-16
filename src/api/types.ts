@@ -9,9 +9,15 @@ export type GameKey =
   | 'high-striker'
   | 'roulette'
   | 'temple-doors'
-  | 'lava-crash';
+  | 'lava-crash'
+  | 'island-reels'
+  | 'dragon-tiger'
+  | 'pirate-dice';
 
-export type ZoneKey = 'harbour' | 'boardwalk' | 'fairground' | 'casino' | 'jungle' | 'volcano';
+/** 'vip' is the VIP Salon upstairs in the Grand Casino (an interior only; it has no ground on the island). */
+export type ZoneKey = 'harbour' | 'boardwalk' | 'fairground' | 'casino' | 'jungle' | 'volcano' | 'vip';
+/** The zones with ground on the island map. */
+export type IslandZone = Exclude<ZoneKey, 'vip'>;
 
 export interface Tier {
   key: string;
@@ -43,6 +49,9 @@ export interface Paytables {
   'temple-doors': { levels: number; doors: number; ladder: number[] };
   'lava-crash': { growth: number; max: number; minAuto: number };
   roulette: { payouts: Record<string, number>; maxBets: number };
+  'island-reels': { tiers: Tier[] };
+  'dragon-tiger': { ranks: number; pays: number; tie: number };
+  'pirate-dice': { faces: string[]; dice: number; pays: number[] };
 }
 
 export interface GameMeta<K extends GameKey = GameKey> {

@@ -1,7 +1,8 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import * as A from './art.ts';
-import { ROOM } from './interior.ts';
+import { ROOMS, type InteriorKind } from './interior.ts';
 import { TH, TW, toScreen } from './map.ts';
+import { tavernDecor, vipDecor, type WallKit } from './roomsArt.ts';
 
 /*
  * Art for the Grand Casino: its interior (walls, slot machines, the bar, chandeliers, the VIP lounge, card tables, the
@@ -26,31 +27,45 @@ function neon(text: string, size: number, color: number): Text {
 
 // ── Walls ───────────────────────────────────────────────────────────────
 
-/** The two back walls, with sconces, the big screen, bar shelves and neon signs. */
-export function buildWalls(): A.Thing {
+/** Each room's wall colours: right (top-right) and left wall base + wainscot, the trim, the pattern. */
+const THEMES: Record<InteriorKind, { right: [number, number]; left: [number, number]; trim: number; pattern: 'damask' | 'planks'; sconce: number }> = {
+  casino: { right: [0x6d44b8, 0x3b2066], left: [0x5a35a0, 0x311a57], trim: 0xf2c14e, pattern: 'damask', sconce: 0xffe27a },
+  vip: { right: [0x2a2350, 0x15112b], left: [0x231d45, 0x110d24], trim: 0xf2c14e, pattern: 'damask', sconce: 0xffc6ff },
+  tavern: { right: [0x8a5a33, 0x5a381f], left: [0x7a4a22, 0x4a2e14], trim: 0x3e2418, pattern: 'planks', sconce: 0xffb347 },
+};
+
+/** A room's two back walls (sconces, then the room's own decor: the casino's screen and neon, the tavern's shelves…). */
+export function buildWalls(kind: InteriorKind = 'casino'): A.Thing {
   const view = new Container();
   const g = new Graphics();
-  const { x0, y0, x1, y1 } = ROOM;
+  const { x0, y0, x1, y1 } = ROOMS[kind];
+  const theme = THEMES[kind];
   const lights: Graphics[] = [];
 
   const panel = (p0: [number, number], p1: [number, number], base: number, dark: number, k: number) => {
     const up = (p: [number, number], h: number) => [p[0], p[1] - h];
     g.poly([...p0, ...p1, ...up(p1, WALL_H), ...up(p0, WALL_H)]).fill(base);
-    // Damask diamonds
-    for (let i = 0; i < 2; i++) {
-      const t = 0.25 + i * 0.5;
-      const cx = p0[0] + (p1[0] - p0[0]) * t, cy = p0[1] + (p1[1] - p0[1]) * t - 120;
-      g.poly([cx, cy - 12, cx + 7, cy, cx, cy + 12, cx - 7, cy]).fill({ color: 0xf2c14e, alpha: 0.35 });
+    if (theme.pattern === 'damask') {
+      for (let i = 0; i < 2; i++) {
+        const t = 0.25 + i * 0.5;
+        const cx = p0[0] + (p1[0] - p0[0]) * t, cy = p0[1] + (p1[1] - p0[1]) * t - 120;
+        g.poly([cx, cy - 12, cx + 7, cy, cx, cy + 12, cx - 7, cy]).fill({ color: 0xf2c14e, alpha: 0.35 });
+      }
+    } else {
+      // Planks: horizontal seams, a beam every third tile.
+      for (let h = 72; h < WALL_H - 20; h += 22)
+        g.moveTo(...(up(p0, h) as [number, number])).lineTo(...(up(p1, h) as [number, number])).stroke({ width: 1.5, color: 0x3e2418, alpha: 0.45 });
+      if (k % 3 === 0) g.poly([...p0, ...up(p0, WALL_H), ...[up(p0, WALL_H)[0] + (p1[0] - p0[0]) * 0.18, up(p0, WALL_H)[1] + (p1[1] - p0[1]) * 0.18], ...[p0[0] + (p1[0] - p0[0]) * 0.18, p0[1] + (p1[1] - p0[1]) * 0.18]]).fill(0x4a2e14);
     }
     g.poly([...p0, ...p1, ...up(p1, 56), ...up(p0, 56)]).fill(dark); // wainscot
-    g.moveTo(...(up(p0, 56) as [number, number])).lineTo(...(up(p1, 56) as [number, number])).stroke({ width: 4, color: 0xf2c14e });
-    g.poly([...up(p0, WALL_H - 18), ...up(p1, WALL_H - 18), ...up(p1, WALL_H), ...up(p0, WALL_H)]).fill(0xf2c14e); // crown
+    g.moveTo(...(up(p0, 56) as [number, number])).lineTo(...(up(p1, 56) as [number, number])).stroke({ width: 4, color: theme.trim });
+    g.poly([...up(p0, WALL_H - 18), ...up(p1, WALL_H - 18), ...up(p1, WALL_H), ...up(p0, WALL_H)]).fill(theme.trim); // crown
     g.moveTo(...(p0)).lineTo(...(up(p0, WALL_H) as [number, number])).stroke({ width: 1.5, color: 0x000000, alpha: 0.12 });
     if (k % 3 === 1) {
       const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2 - 104;
-      g.roundRect(mx - 4, my - 4, 8, 16, 3).fill(0xf2c14e);
+      g.roundRect(mx - 4, my - 4, 8, 16, 3).fill(theme.trim === 0xf2c14e ? 0xf2c14e : 0x8a8fa3);
       const glow = new Graphics();
-      glow.circle(mx, my - 8, 20).fill({ color: 0xffe27a, alpha: 0.25 });
+      glow.circle(mx, my - 8, 20).fill({ color: theme.sconce, alpha: 0.25 });
       glow.circle(mx, my - 8, 6).fill(0xfff6c2);
       lights.push(glow);
     }
@@ -59,20 +74,20 @@ export function buildWalls(): A.Thing {
   // Back-right wall: the n→e edge of every tile in the top row.
   for (let gx = x0; gx <= x1; gx++) {
     const { x, y } = toScreen(gx, y0);
-    panel([x, y - HH], [x + HW, y], 0x6d44b8, 0x3b2066, gx - x0);
+    panel([x, y - HH], [x + HW, y], theme.right[0], theme.right[1], gx - x0);
   }
   // Back-left wall: the w→n edge of every tile in the left column (a shade darker).
   for (let gy = y0; gy <= y1; gy++) {
     const { x, y } = toScreen(x0, gy);
-    panel([x - HW, y], [x, y - HH], 0x5a35a0, 0x311a57, gy - y0);
+    panel([x - HW, y], [x, y - HH], theme.left[0], theme.left[1], gy - y0);
   }
   // Outlines along the tops and the corner post.
   const tl = toScreen(x0, y1), tc = toScreen(x0, y0), tr = toScreen(x1, y0);
   g.moveTo(tl.x - HW, tl.y - WALL_H).lineTo(tc.x, tc.y - HH - WALL_H).lineTo(tr.x + HW, tr.y - WALL_H).stroke({ width: 4, color: OUT });
-  ln(g.roundRect(tc.x - 9, tc.y - HH - WALL_H - 6, 18, WALL_H + 6, 6).fill(0xf2c14e), 3);
+  ln(g.roundRect(tc.x - 9, tc.y - HH - WALL_H - 6, 18, WALL_H + 6, 6).fill(theme.trim), 3);
   view.addChild(g, ...lights);
 
-  // Right wall decor: skewed so it lies flat on the wall (the wall rises 1 px for every 2 px left).
+  // Wall decor: skewed so it lies flat on the wall (the wall rises 1 px for every 2 px left).
   const onRight = (gx: number, h: number) => {
     const c = new Container();
     const { x, y } = toScreen(gx, y0);
@@ -89,7 +104,19 @@ export function buildWalls(): A.Thing {
     view.addChild(c);
     return c;
   };
+  const kit: WallKit = { view, onRight, onLeft };
+  const decor = kind === 'tavern' ? tavernDecor(kit) : kind === 'vip' ? vipDecor(kit) : casinoDecor(kit);
+  return {
+    view,
+    update: (t) => {
+      lights.forEach((l, i) => (l.alpha = 0.75 + Math.sin(t * 2 + i) * 0.25));
+      decor(t);
+    },
+  };
+}
 
+/** The Grand Casino's walls: the Lava Crash screen, VIP neon, the bar's shelves, card suits and the casino's name. */
+function casinoDecor({ onRight, onLeft }: WallKit): (t: number) => void {
   // The big screen: an advert for Lava Crash, with lava bubbling across it.
   const screen = onRight(17, 186);
   const sw = 8 * HW;
@@ -111,9 +138,9 @@ export function buildWalls(): A.Thing {
   sub.position.set(sw / 2, 60);
   screen.addChild(sg, lava, mask, title, sub);
 
-  // VIP neon over the lounge.
+  // VIP neon over the stairs up.
   const vip = onRight(29, 160);
-  const vt = neon('VIP LOUNGE', 30, 0xff4fb0);
+  const vt = neon('VIP SALON', 30, 0xff4fb0);
   vt.position.set(8, 0);
   vip.addChild(vt);
 
@@ -142,15 +169,11 @@ export function buildWalls(): A.Thing {
   gt.position.set(0, 0);
   gc.addChild(gt);
 
-  return {
-    view,
-    update: (t) => {
-      lights.forEach((l, i) => (l.alpha = 0.75 + Math.sin(t * 2 + i) * 0.25));
-      lava.y = Math.sin(t * 1.5) * 5;
-      lava.x = ((t * 30) % (sw / 11)) - sw / 11;
-      title.alpha = 0.8 + Math.abs(Math.sin(t * 3)) * 0.2;
-      vt.alpha = Math.sin(t * 7) > -0.9 ? 1 : 0.4;
-    },
+  return (t) => {
+    lava.y = Math.sin(t * 1.5) * 5;
+    lava.x = ((t * 30) % (sw / 11)) - sw / 11;
+    title.alpha = 0.8 + Math.abs(Math.sin(t * 3)) * 0.2;
+    vt.alpha = Math.sin(t * 7) > -0.9 ? 1 : 0.4;
   };
 }
 
@@ -342,10 +365,10 @@ export function tablesBoard(): A.Thing {
   ln(g.roundRect(-46, -128, 92, 74, 10).fill(0x1a0f24), 3.5);
   g.roundRect(-40, -122, 80, 62, 7).stroke({ width: 2, color: 0xf2c14e });
   view.addChild(g);
-  const t1 = neon('ROULETTE', 15, 0x2fc36f);
+  const t1 = neon('TABLES', 15, 0x2fc36f);
   t1.anchor.set(0.5);
   t1.position.set(0, -108);
-  const t2 = new Text({ text: 'European\nsingle zero\nRTP 97.3%', style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: 11, fill: 0xffe27a, align: 'center', lineHeight: 12 } });
+  const t2 = new Text({ text: 'Roulette 97.3%\nDragon Tiger 96%\nReels 96%', style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: 11, fill: 0xffe27a, align: 'center', lineHeight: 12 } });
   t2.resolution = 2;
   t2.anchor.set(0.5);
   t2.position.set(0, -78);

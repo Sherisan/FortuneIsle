@@ -1,4 +1,4 @@
-import type { GameKey, ZoneKey } from '../api/types.ts';
+import type { GameKey, IslandZone, ZoneKey } from '../api/types.ts';
 
 /*
  * FORTUNE ISLE's map: a 48 × 48 isometric grid, generated deterministically (same island every load).
@@ -7,7 +7,8 @@ import type { GameKey, ZoneKey } from '../api/types.ts';
  *     ("routes loop back to the casino"); each zone has a paved plaza.
  *   - Landmarks (lighthouse, ferris wheel, casino, temple, volcano) sit in the widest gap between a zone's paths; its
  *     stalls and signpost ring the plaza in the next widest gaps.
- * Stalls are data (SPOT_DEFS): adding a game is an entry here plus its overlay.
+ * Stalls are data (SPOT_DEFS): adding a game is an entry here plus its overlay. Buildings you walk into (the Grand
+ * Casino, the Rusty Anchor tavern) have an 'enter' spot at their door naming the interior it leads to (interior.ts).
  */
 
 export const N = 48;
@@ -46,7 +47,8 @@ export const FUN_LABELS: Record<string, string> = {
   temple: 'Touch the temple gem',
 };
 
-export type SceneKey = 'island' | 'casino';
+/** The island, and the interiors you walk into: the Grand Casino, its VIP Salon upstairs, and the Rusty Anchor tavern. */
+export type SceneKey = 'island' | 'casino' | 'vip' | 'tavern';
 
 export interface Spot {
   id: string;
@@ -59,6 +61,8 @@ export interface Spot {
   /** The walkable tile the player stands on to use it. */
   ax: number;
   ay: number;
+  /** enter / exit: the scene the doorway leads to. */
+  to?: SceneKey;
 }
 
 export interface Prop {
@@ -86,10 +90,11 @@ export interface WorldMap {
   props: Prop[];
   gates: Gate[];
   spawn: { gx: number; gy: number };
-  centers: Record<ZoneKey, [number, number]>;
+  /** Zone centres (fast travel falls back to them). Interiors list none. */
+  centers: Partial<Record<ZoneKey, [number, number]>>;
 }
 
-export const CENTERS: Record<ZoneKey, [number, number]> = {
+export const CENTERS: Record<IslandZone, [number, number]> = {
   casino: [24, 24],
   harbour: [34, 34],
   boardwalk: [36, 23],
@@ -109,7 +114,7 @@ const DISCS: [number, number, number][] = [
   [38, 12, 4.5],
 ];
 
-const LINKS: [ZoneKey, ZoneKey, number][] = [
+const LINKS: [IslandZone, IslandZone, number][] = [
   ['casino', 'harbour', 0],
   ['casino', 'boardwalk', 0.8],
   ['casino', 'fairground', -0.8],
@@ -122,7 +127,7 @@ const LINKS: [ZoneKey, ZoneKey, number][] = [
   ['volcano', 'fairground', -2],
 ];
 
-const LANDMARKS: Partial<Record<ZoneKey, { kind: string; dist: number; size: number }>> = {
+const LANDMARKS: Partial<Record<IslandZone, { kind: string; dist: number; size: number }>> = {
   harbour: { kind: 'lighthouse', dist: 7.5, size: 1.2 },
   fairground: { kind: 'ferris', dist: 5.2, size: 1.6 },
   casino: { kind: 'casino', dist: 5.4, size: 2.1 },
@@ -131,8 +136,10 @@ const LANDMARKS: Partial<Record<ZoneKey, { kind: string; dist: number; size: num
 };
 
 /** Spots ringing each plaza, in placement order (the first gets the best gap). */
-const SPOT_DEFS: Record<ZoneKey, { id: string; kind: SpotKind; game?: GameKey; label: string; front?: boolean }[]> = {
+const SPOT_DEFS: Record<IslandZone, { id: string; kind: SpotKind; game?: GameKey; label: string; front?: boolean | 'tavern'; to?: SceneKey }[]> = {
   harbour: [
+    // The Rusty Anchor's door (Pirate Dice is inside).
+    { id: 'tavern-door', kind: 'enter', to: 'tavern', label: 'The Rusty Anchor', front: 'tavern' },
     { id: 'daily', kind: 'daily', label: 'Daily Chest' },
     { id: 'wardrobe', kind: 'wardrobe', label: 'Wardrobe' },
     { id: 'board', kind: 'board', label: 'Notice Board' },
@@ -153,7 +160,7 @@ const SPOT_DEFS: Record<ZoneKey, { id: string; kind: SpotKind; game?: GameKey; l
   ],
   casino: [
     // The door: walking in opens the entrance overlay, then the casino's interior map (roulette is inside).
-    { id: 'casino-door', kind: 'enter', label: 'Grand Casino', front: true },
+    { id: 'casino-door', kind: 'enter', to: 'casino', label: 'Grand Casino', front: true },
     { id: 'sign-casino', kind: 'travel', label: 'Signpost' },
   ],
   jungle: [
@@ -167,10 +174,10 @@ const SPOT_DEFS: Record<ZoneKey, { id: string; kind: SpotKind; game?: GameKey; l
 };
 
 const PATH_GROUND: Record<ZoneKey, Ground> = {
-  harbour: 'planks', boardwalk: 'planks', fairground: 'cobble', casino: 'plaza', jungle: 'ruin', volcano: 'basalt',
+  harbour: 'planks', boardwalk: 'planks', fairground: 'cobble', casino: 'plaza', jungle: 'ruin', volcano: 'basalt', vip: 'marble',
 };
 const LAND_GROUND: Record<ZoneKey, Ground> = {
-  harbour: 'grass', boardwalk: 'sand', fairground: 'meadow', casino: 'grass', jungle: 'jungle', volcano: 'rock',
+  harbour: 'grass', boardwalk: 'sand', fairground: 'meadow', casino: 'grass', jungle: 'jungle', volcano: 'rock', vip: 'marble',
 };
 
 function mulberry(seed: number) {
@@ -196,7 +203,7 @@ const angDiff = (a: number, b: number) => {
 export function buildMap(): WorldMap {
   const rnd = mulberry(20261114);
   const cells: Cell[] = [];
-  const zones = Object.keys(CENTERS) as ZoneKey[];
+  const zones = Object.keys(CENTERS) as IslandZone[];
 
   // Land and zones.
   for (let gy = 0; gy < N; gy++)
@@ -233,7 +240,7 @@ export function buildMap(): WorldMap {
   };
 
   // Paths: gently curved, two tiles wide.
-  const pathAngles: Record<ZoneKey, number[]> = { casino: [], harbour: [], boardwalk: [], fairground: [], jungle: [], volcano: [] };
+  const pathAngles: Record<IslandZone, number[]> = { casino: [], harbour: [], boardwalk: [], fairground: [], jungle: [], volcano: [] };
   for (const [a, b, bend] of LINKS) {
     const [ax, ay] = CENTERS[a];
     const [bx, by] = CENTERS[b];
@@ -287,7 +294,7 @@ export function buildMap(): WorldMap {
     if (c) taken.add(idx(gx, gy));
   };
 
-  const approach = (gx: number, gy: number, z: ZoneKey) => {
+  const approach = (gx: number, gy: number, z: IslandZone) => {
     const [cx, cy] = CENTERS[z];
     let best: [number, number] = [cx, cy];
     let bd = Infinity;
@@ -340,8 +347,30 @@ export function buildMap(): WorldMap {
       used.push(lmAngle);
     }
 
+    // The Rusty Anchor: a second building on the Harbour, behind the plaza (the lighthouse keeps the coast).
+    let tavernAngle: number | null = null;
+    if (z === 'harbour') {
+      const UP = -0.75 * Math.PI;
+      let best = -Infinity;
+      for (let k = 0; k < 72; k++) {
+        const a = (k / 72) * Math.PI * 2 - Math.PI;
+        const gap = gapScore(a);
+        if (gap < 0.7) continue;
+        const s = gap + 0.9 * Math.cos(angDiff(a, UP));
+        if (s > best) { best = s; tavernAngle = a; }
+      }
+      tavernAngle ??= bestAngle();
+      const size = 1.4, dist = 5.1;
+      const tx = Math.round(cx + Math.cos(tavernAngle) * dist), ty = Math.round(cy + Math.sin(tavernAngle) * dist);
+      props.push({ kind: 'tavern', gx: tx, gy: ty, zone: z, seed: rnd(), size });
+      const f = Math.ceil(size);
+      for (let dy = -f; dy <= f; dy++) for (let dx = -f; dx <= f; dx++) if (Math.hypot(dx, dy) <= size + 0.2) block(tx + dx, ty + dy);
+      used.push(tavernAngle);
+    }
+
     for (const def of SPOT_DEFS[z]) {
-      let angle = def.front && lmAngle != null ? lmAngle : bestAngle();
+      const frontAngle = def.front === 'tavern' ? tavernAngle : def.front ? lmAngle : null;
+      let angle = frontAngle ?? bestAngle();
       let dist = def.front ? 3.2 : def.kind === 'travel' ? 2.6 : 3.4;
       let gx = Math.round(cx + Math.cos(angle) * dist), gy = Math.round(cy + Math.sin(angle) * dist);
       // Nudge off a taken tile.
@@ -441,7 +470,7 @@ export function buildMap(): WorldMap {
   }
 
   // Lamp posts along the casino and fairground plazas; bunting posts on the boardwalk.
-  for (const z of ['casino', 'fairground', 'boardwalk'] as ZoneKey[]) {
+  for (const z of ['casino', 'fairground', 'boardwalk'] as IslandZone[]) {
     const [cx, cy] = CENTERS[z];
     const r = z === 'casino' ? 4.3 : 3.7;
     for (let k = 0; k < 8; k++) {
@@ -479,7 +508,7 @@ export function buildMap(): WorldMap {
   for (const p of props) {
     const label = FUN_LABELS[p.kind];
     if (!label || !p.zone) continue;
-    const [cx, cy] = CENTERS[p.zone];
+    const [cx, cy] = CENTERS[p.zone as IslandZone];
     const f = Math.ceil(p.size ?? 1);
     let best: [number, number] | null = null;
     let bd = Infinity;

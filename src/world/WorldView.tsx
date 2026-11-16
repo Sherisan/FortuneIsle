@@ -16,10 +16,10 @@ export function handleInteract(spot: Spot) {
   if (g.game || g.panel || g.doorway) return;
   switch (spot.kind) {
     case 'enter':
-      useGame.setState({ doorway: 'enter' });
+      useGame.setState({ doorway: { kind: 'enter', to: spot.to ?? 'casino' } });
       break;
     case 'exit':
-      useGame.setState({ doorway: 'exit' });
+      useGame.setState({ doorway: { kind: 'exit', to: spot.to ?? 'island' } });
       break;
     case 'fun': {
       const started = world.engine?.fun(spot.id);

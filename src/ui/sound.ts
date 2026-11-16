@@ -9,7 +9,8 @@ let master: GainNode | null = null;
 let muted = false;
 let ambienceNodes: { stop(): void } | null = null;
 let ambienceWanted = false;
-let ambienceKind: 'island' | 'casino' = 'island';
+type Ambience = 'island' | 'casino' | 'vip' | 'tavern';
+let ambienceKind: Ambience = 'island';
 
 function ac(): AudioContext | null {
   if (!ctx) {
@@ -79,8 +80,9 @@ export const sound = {
       ambienceNodes = null;
     } else if (ambienceWanted) this.ambience(true, ambienceKind);
   },
-  /** Surf and gulls on the island; crowd murmur, chips and a lounge chord inside the casino. */
-  ambience(on: boolean, kind: 'island' | 'casino' = ambienceKind) {
+  /** Surf and gulls on the island; crowd murmur, chips and a lounge chord in the casino and the VIP Salon; a crackling
+   *  hearth, clinking tankards and a sea-shanty squeezebox in the Rusty Anchor. */
+  ambience(on: boolean, kind: Ambience = ambienceKind) {
     ambienceWanted = on;
     if (kind !== ambienceKind) {
       ambienceKind = kind;
@@ -94,7 +96,45 @@ export const sound = {
     }
     const c = ac();
     if (!c || !master || ambienceNodes) return;
-    if (kind === 'casino') {
+    if (kind === 'tavern') {
+      // Hearth: brown noise through a lowpass, with random crackles.
+      const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
+      const d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < d.length; i++) {
+        last = last * 0.985 + (Math.random() * 2 - 1) * 0.015;
+        d[i] = last * 5 + (Math.random() < 0.0006 ? (Math.random() - 0.5) * 1.6 : 0);
+      }
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 900;
+      const g = c.createGain();
+      g.gain.value = 0.07;
+      src.connect(f).connect(g).connect(master);
+      src.start();
+      // A slow shanty in D minor on a reedy squeezebox, a clink now and then.
+      const tune = [[294, 349, 440], [262, 330, 392], [233, 294, 349], [220, 277, 330]];
+      let k = 0;
+      const timer = window.setInterval(() => {
+        const r = Math.random();
+        if (r < 0.55) tune[k++ % tune.length].forEach((n, i) => tone(n, 1.4, { type: 'sawtooth', vol: 0.008, at: i * 0.04, attack: 0.12 }));
+        else if (r < 0.75) {
+          tone(2600 + Math.random() * 500, 0.08, { type: 'triangle', vol: 0.025 });
+          tone(3100 + Math.random() * 400, 0.07, { type: 'triangle', vol: 0.018, at: 0.06 });
+        }
+      }, 1600);
+      ambienceNodes = {
+        stop() {
+          try { src.stop(); } catch { /* already stopped */ }
+          window.clearInterval(timer);
+        },
+      };
+      return;
+    }
+    if (kind === 'casino' || kind === 'vip') {
       const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
       const d = buf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;

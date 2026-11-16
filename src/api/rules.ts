@@ -34,6 +34,34 @@ export const SCRATCH_TABLE: Tier[] = [
 ];
 export const SCRATCH_SYMBOLS = SCRATCH_TABLE.slice(1).map((x) => x.key);
 
+/** Island Reels (Grand Casino slots): the line's tier is drawn, then the reels are dealt to show it. */
+export const REELS_TABLE: Tier[] = [
+  t('lose', 0, 517),
+  t('shell', 1, 300),
+  t('starfish', 2, 120),
+  t('coconut', 4, 50),
+  t('parrot', 10, 10),
+  t('pearl', 25, 2),
+  t('seven', 70, 1),
+];
+export const REEL_SYMBOLS = REELS_TABLE.slice(1).map((x) => x.key);
+
+/** Dragon Tiger: one card each from an infinite deck, ranks 0 (ace) … 12 (king). */
+export const CARD_RANKS = 13;
+export const DT_SIDES = ['dragon', 'tiger', 'tie'] as const;
+export const DT_PAYS = 2.08;
+export const DT_TIE = 12.48;
+export function dtMultiplier(choice: number, dragon: number, tiger: number) {
+  if (choice === 0) return dragon > tiger ? DT_PAYS : 0;
+  if (choice === 1) return tiger > dragon ? DT_PAYS : 0;
+  return dragon === tiger ? DT_TIE : 0;
+}
+
+/** Pirate Dice (crown and anchor): pick a face, roll three dice; pays by matches 0..3. */
+export const DICE_FACES = ['anchor', 'skull', 'parrot', 'ship', 'chest', 'compass'];
+export const DICE_COUNT = 3;
+export const DICE_PAYS = [0, 2, 3, 12.36];
+
 export const TEMPLE_LEVELS = 8;
 export const TEMPLE_DOORS = 3;
 /** 0.96 × 1.5^level floored to 2 dp. */
@@ -88,6 +116,7 @@ export const ZONES: Zone[] = [
   { key: 'casino', name: 'Grand Casino', level: 2 },
   { key: 'jungle', name: 'Jungle Ruins', level: 3 },
   { key: 'volcano', name: 'Volcano Summit', level: 4 },
+  { key: 'vip', name: 'VIP Salon', level: 5 },
 ];
 
 const c = (id: string, kind: Cosmetic['kind'], name: string, level: number): Cosmetic => ({ id, kind, name, level });
@@ -125,6 +154,9 @@ export const GAMES: { key: GameKey; name: string; zone: ZoneKey; kind: GameMeta[
   { key: 'roulette', name: 'Roulette', zone: 'casino', kind: 'instant' },
   { key: 'temple-doors', name: 'Temple Doors', zone: 'jungle', kind: 'steps' },
   { key: 'lava-crash', name: 'Lava Crash', zone: 'volcano', kind: 'crash' },
+  { key: 'island-reels', name: 'Island Reels', zone: 'casino', kind: 'instant' },
+  { key: 'dragon-tiger', name: 'Dragon Tiger', zone: 'casino', kind: 'instant' },
+  { key: 'pirate-dice', name: 'Pirate Dice', zone: 'harbour', kind: 'instant' },
 ];
 
 /** The info a real API returns, built from these rules (demo engine). */
@@ -140,6 +172,9 @@ export function demoInfo(): Info {
       case 'temple-doors': return { levels: TEMPLE_LEVELS, doors: TEMPLE_DOORS, ladder: TEMPLE_LADDER };
       case 'lava-crash': return { growth: LAVA_GROWTH, max: LAVA_MAX, minAuto: LAVA_MIN_AUTO };
       case 'roulette': return { payouts: ROULETTE_PAYOUTS, maxBets: 30 };
+      case 'island-reels': return { tiers: REELS_TABLE };
+      case 'dragon-tiger': return { ranks: CARD_RANKS, pays: DT_PAYS, tie: DT_TIE };
+      case 'pirate-dice': return { faces: DICE_FACES, dice: DICE_COUNT, pays: DICE_PAYS };
     }
   };
   return {

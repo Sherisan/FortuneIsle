@@ -608,3 +608,95 @@ table.pay { width: 100%; border-collapse: separate; border-spacing: 0; border: 3
 .free-list small, .award-list small { color: var(--muted); font-weight: 700; font-size: 12px; }
 .award-list li span { display: flex; flex-direction: column; }
 .award-list li b { color: var(--good); font: 600 14px var(--font); white-space: nowrap; }
+
+/* ── Rooms: entrance facades, banners ─────────────────────────────────── */
+.zone-banner.z-vip { background: linear-gradient(#3a2f7a, #15112b); color: var(--gold); }
+.zone-banner.z-tavern { background: linear-gradient(#b07a45, #6b4428); color: #ffe27a; }
+.z-vip { background: #e9e4ff; }
+.doorway.d-vip { background: radial-gradient(ellipse at 50% 30%, rgba(42,35,80,.94), rgba(13,10,31,.98) 70%); }
+.doorway.d-vip .marquee { background: #15112b; color: #ffc6ff; text-shadow: 0 0 10px #ff4fb0, 0 0 2px #fff; }
+.doorway.d-vip .arch { background: linear-gradient(#fff3b0, #f2c14e); }
+.doorway.d-vip .door-l, .doorway.d-vip .door-r { background: linear-gradient(90deg, #15112b, #2a2350 50%, #15112b); }
+.doorway.d-vip .carpet { background: linear-gradient(#c0479c, #8a2a6e); }
+.doorway.d-tavern { background: radial-gradient(ellipse at 50% 30%, rgba(122,74,34,.94), rgba(31,20,12,.98) 70%); }
+.doorway.d-tavern::before { background: radial-gradient(circle, rgba(255,179,71,.45) 1px, transparent 2px) 0 0 / 40px 40px; }
+.doorway.d-tavern .marquee { background: #3e2418; color: #ffe27a; text-shadow: 0 0 8px #ffb347; border-radius: 10px; }
+.doorway.d-tavern .marquee::before { display: none; }
+.doorway.d-tavern .arch { border-radius: 26px 26px 0 0; background: linear-gradient(#a06a38, #6b4428); box-shadow: inset 0 0 0 4px #3e2418; }
+.doorway.d-tavern .door-light { border-radius: 16px 16px 0 0; background: radial-gradient(ellipse at 50% 35%, #fff0c2, #ffb347 45%, #7a3b1f 85%); }
+.doorway.d-tavern .door-light .chand { width: 34px; height: 44px; margin-left: -17px; border-radius: 8px; background: #ffd27a; box-shadow: 0 0 34px 14px rgba(255,179,71,.85); }
+.doorway.d-tavern .door-light::after { background: linear-gradient(transparent, rgba(107,68,40,.85)); }
+.doorway.d-tavern .door-l, .doorway.d-tavern .door-r { background: repeating-linear-gradient(90deg, #8a5a33 0 18px, #7a4a22 18px 20px); box-shadow: inset 0 0 0 5px #3e2418; }
+.doorway.d-tavern .door-l { border-radius: 14px 0 0 0; } .doorway.d-tavern .door-r { border-radius: 0 14px 0 0; }
+.doorway.d-tavern .door-l::after, .doorway.d-tavern .door-r::after { border-color: rgba(62,36,24,.7); border-radius: 4px; inset: 18% 22% 60%; }
+.doorway.d-tavern .carpet { background: linear-gradient(#a06a38, #5a381f); }
+.exit-fade.to-casino { background: #2a1640; }
+.exit-fade.to-casino span { color: #ffe27a; }
+
+/* ── Island Reels ─────────────────────────────────────────────────────── */
+.reels-cab { position: relative; margin: 0 auto; width: min(360px, 100%); border: 4px solid var(--plum); border-radius: 26px 26px 18px 18px; padding: 12px 46px 12px 14px; background: linear-gradient(#2fd3df, #0e8f99); box-shadow: 0 6px 0 var(--plum); }
+.reels-cab.gold { background: linear-gradient(#fff3b0, #f2c14e 40%, #c99a2e); }
+.reels-marquee { text-align: center; font: 700 17px var(--font); color: #fff3b0; background: var(--plum); border-radius: 12px; padding: 5px 8px; margin-bottom: 10px; letter-spacing: 1px; text-shadow: 0 0 8px #ffd23f; }
+.reels-window { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: var(--plum); border: 3px solid var(--plum); border-radius: 14px; padding: 8px; }
+.reels-window.win { box-shadow: 0 0 0 4px var(--gold), 0 0 26px 6px rgba(255,210,63,.75); animation: pop .4s cubic-bezier(.3,1.8,.5,1); }
+.reel { height: 92px; border-radius: 10px; background: linear-gradient(#e8e0d0, #fffdf2 30%, #fffdf2 70%, #e8e0d0); display: grid; place-items: center; overflow: hidden; }
+.reel .sym { font-size: 46px; line-height: 1; }
+.reel.spinning .sym { filter: blur(2px); transform: translateY(6px) scaleY(1.15); opacity: .85; }
+.reel.stopped .sym { animation: reelStop .3s cubic-bezier(.3,1.8,.5,1); }
+@keyframes reelStop { from { transform: translateY(-14px); } }
+.sym.s-seven { font: 700 50px var(--font); color: #ff3b4e; -webkit-text-stroke: 2px var(--plum); }
+.payline { position: absolute; left: 4px; right: 4px; top: 50%; height: 3px; margin-top: -1.5px; background: rgba(255,59,78,.55); pointer-events: none; }
+.reels-lever { position: absolute; right: 10px; top: 58px; width: 16px; height: 86px; border: 0; background: linear-gradient(90deg, #c0c6d4, #8a8fa3); border-radius: 8px; cursor: pointer; transform-origin: 50% 100%; transition: transform .15s; }
+.reels-lever::before { content: ""; position: absolute; left: 50%; top: -14px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff8a8a, #e5394b); border: 3px solid var(--plum); }
+.reels-lever.pull { transform: scaleY(.55); }
+.reels-lever:disabled { cursor: default; }
+.reels-pay { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 10px; font: 700 12px var(--font); color: var(--plum); }
+.reels-pay span { background: rgba(255,255,255,.75); border-radius: 8px; padding: 2px 4px; text-align: center; white-space: nowrap; }
+.reels-pay span.hit { background: var(--gold); box-shadow: 0 0 0 2px var(--plum); }
+.reels-pay .sym { font-style: normal; font-size: 13px; margin-right: 2px; }
+.reels-pay .sym.s-seven { font-size: 14px; -webkit-text-stroke: 0; }
+
+/* ── Dragon Tiger ─────────────────────────────────────────────────────── */
+.dt-table { position: relative; border: 4px solid var(--plum); border-radius: 22px; padding: 12px; background: radial-gradient(ellipse at 50% 20%, #b02a3c, #6e1424); box-shadow: inset 0 0 0 4px #f2c14e; }
+.dt-table.gold { box-shadow: inset 0 0 0 4px #fff3b0, 0 0 22px rgba(255,210,63,.5); }
+.dt-hands { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dt-hand { text-align: center; border-radius: 16px; padding: 8px 6px 10px; transition: box-shadow .3s; }
+.dt-hand h4 { margin: 0 0 6px; font: 700 15px var(--font); color: #ffe27a; letter-spacing: 1px; }
+.dt-hand.dragon { background: rgba(214,32,63,.35); } .dt-hand.tiger { background: rgba(42,111,208,.35); }
+.dt-hand.won { box-shadow: 0 0 0 3px var(--gold), 0 0 22px rgba(255,210,63,.8); }
+.dt-card { position: relative; width: 74px; height: 104px; margin: 0 auto; perspective: 600px; }
+.dt-back, .dt-face { position: absolute; inset: 0; border: 3px solid var(--plum); border-radius: 10px; backface-visibility: hidden; transition: transform .45s cubic-bezier(.4,1.4,.6,1); }
+.dt-back { background: repeating-linear-gradient(45deg, #2c1d3f 0 6px, #4a3566 6px 12px); box-shadow: inset 0 0 0 4px #f2c14e; }
+.dt-face { background: #fffdf8; transform: rotateY(180deg); display: grid; place-items: center; color: var(--plum); }
+.dt-face.red { color: #d6203f; }
+.dt-face b { position: absolute; left: 6px; top: 3px; font: 700 18px var(--font); }
+.dt-face b.flip { left: auto; top: auto; right: 6px; bottom: 3px; transform: rotate(180deg); }
+.dt-face span { font-size: 40px; line-height: 1; }
+.dt-card.up .dt-back { transform: rotateY(-180deg); }
+.dt-card.up .dt-face { transform: rotateY(0); }
+.dt-card.win .dt-face { box-shadow: 0 0 0 3px var(--gold); }
+.dt-tie { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-8deg); font: 700 30px var(--font); color: #fff; background: #2fc36f; border: 3px solid var(--plum); border-radius: 14px; padding: 2px 14px; animation: pop .4s cubic-bezier(.3,1.8,.5,1); }
+.dt-bets { display: grid; grid-template-columns: 1fr .8fr 1fr; gap: 8px; margin-top: 12px; }
+.dt-bet { display: flex; flex-direction: column; align-items: center; gap: 0; border: 3px solid var(--plum); border-radius: 14px; padding: 6px 4px; cursor: pointer; font-family: var(--font); color: #fff; box-shadow: 0 4px 0 var(--plum); }
+.dt-bet.dragon { background: linear-gradient(#ff5b6e, #d6203f); } .dt-bet.tiger { background: linear-gradient(#5aa2ff, #2a6fd0); } .dt-bet.tie { background: linear-gradient(#5fd38a, #229a55); }
+.dt-bet span { font-size: 22px; } .dt-bet b { font-size: 16px; } .dt-bet small { font-size: 11px; font-weight: 700; opacity: .9; }
+.dt-bet.on { outline: 4px solid var(--gold); outline-offset: 1px; transform: translateY(-2px); }
+.dt-bet.won { animation: pop .4s cubic-bezier(.3,1.8,.5,1); }
+.dt-bet:disabled { cursor: default; }
+
+/* ── Pirate Dice ──────────────────────────────────────────────────────── */
+.pd-table { border: 4px solid var(--plum); border-radius: 22px; padding: 12px; background: radial-gradient(ellipse at 50% 30%, #3f9a4d, #2f7a3a 60%, #22592a); box-shadow: inset 0 0 0 5px #8a5a33, 0 6px 0 var(--plum); }
+.pd-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pd-face { display: flex; flex-direction: column; align-items: center; border: 3px solid var(--plum); border-radius: 14px; padding: 6px 2px; background: #fff6e5; cursor: pointer; font-family: var(--font); box-shadow: 0 4px 0 var(--plum); }
+.pd-face span { font-size: 28px; line-height: 1.1; } .pd-face small { font-size: 12px; font-weight: 700; color: var(--plum-2); }
+.pd-face.on { background: linear-gradient(#ffe066, var(--gold-2)); outline: 3px solid #fff; transform: translateY(-2px); }
+.pd-face.hit { animation: pop .4s cubic-bezier(.3,1.8,.5,1); }
+.pd-face:disabled { cursor: default; }
+.pd-dice { display: flex; justify-content: center; gap: 14px; margin: 16px 0 10px; min-height: 66px; }
+.pd-die { width: 62px; height: 62px; display: grid; place-items: center; font-size: 34px; border: 3px solid var(--plum); border-radius: 14px; background: linear-gradient(#fffdf8, #efe4cf); box-shadow: 0 5px 0 var(--plum); }
+.pd-dice.rolling .pd-die { animation: tumble .28s linear infinite; }
+@keyframes tumble { 0% { transform: rotate(0) translateY(0); } 50% { transform: rotate(180deg) translateY(-12px); } 100% { transform: rotate(360deg) translateY(0); } }
+.pd-die.match { background: linear-gradient(#ffe066, var(--gold-2)); box-shadow: 0 5px 0 var(--plum), 0 0 18px rgba(255,210,63,.9); animation: pop .4s cubic-bezier(.3,1.8,.5,1); }
+.pd-pays { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; font: 700 13px var(--font); color: #fff; }
+.pd-pays span { background: rgba(0,0,0,.25); border-radius: 10px; padding: 3px 8px; }
+.pd-pays span.hit { background: var(--gold); color: var(--plum); }

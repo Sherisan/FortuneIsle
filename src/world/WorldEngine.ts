@@ -1,17 +1,19 @@
 import { Application, Container, CullerPlugin, extensions, Graphics, Point } from 'pixi.js';
-import type { ZoneKey } from '../api/types.ts';
+import type { IslandZone, ZoneKey } from '../api/types.ts';
 import * as A from './art.ts';
 import * as C from './casinoArt.ts';
 import { buildGround, type GroundLayers } from './ground.ts';
 import { Ambient, Particles } from './fun.ts';
-import { buildCasinoInterior } from './interior.ts';
+import { buildInterior } from './interior.ts';
+import * as R from './roomsArt.ts';
 import { sound } from '../ui/sound.ts';
 import { buildMap, findPath, idx, inside, nearestWalkable, TH, toGrid, toScreen, type Cell, type Prop, type SceneKey, type Spot, type WorldMap } from './map.ts';
 
 extensions.add(CullerPlugin);
 
 /*
- * WorldEngine (Pixi): the current map (the island, or the Grand Casino's interior), the camera, input and every entity.
+ * WorldEngine (Pixi): the current map (the island, or a room: the Grand Casino, its VIP Salon, the Rusty Anchor), the
+ * camera, input and every entity.
  * The player is one entity among others, moving by move targets (path tiles), so a remote player could later be another
  * entity driven by a MovementSync. React talks to it through the callbacks and the public methods; it never touches money.
  *
@@ -33,7 +35,9 @@ const SPEED = 4.6; // tiles per second
 const NEAR = 1.75; // tiles
 const DOOR_FIRE = 1.5; // walk this close to a doorway and it opens
 const DOOR_REARM = 2.3;
-const BACKGROUND: Record<SceneKey, number> = { island: 0x1b8cc2, casino: 0x1a0f24 };
+const BACKGROUND: Record<SceneKey, number> = { island: 0x1b8cc2, casino: 0x1a0f24, vip: 0x0d0a1f, tavern: 0x1f140c };
+/** Buildings on the island you walk into: tapping one walks to its door. Half-width and height of the tap box. */
+const BUILDINGS: Record<string, [number, number]> = { casino: [190, 330], tavern: [130, 230] };
 
 export class WorldEngine {
   private app = new Application();
@@ -140,12 +144,13 @@ export class WorldEngine {
   }
 
   /**
-   * Builds and shows a map. Coming back to the island puts the player at the casino's door; going into the casino puts
-   * them just inside its exit. Any doorway the player arrives next to stays disarmed until they walk away from it.
+   * Builds and shows a map. Arriving through a doorway puts the player at the door that leads back where they came from
+   * (out of the casino: at its red carpet; down from the VIP Salon: at the stairs); otherwise at the map's spawn, just
+   * inside its exit. Any doorway the player arrives next to stays disarmed until they walk away from it.
    */
   enterScene(kind: SceneKey, at?: { gx: number; gy: number }) {
     const fromKind = this.map?.kind;
-    const map = (this.maps[kind] ??= kind === 'island' ? buildMap() : buildCasinoInterior());
+    const map = (this.maps[kind] ??= kind === 'island' ? buildMap() : buildInterior(kind));
 
     // Keep the persistent entities; throw away the old scene.
     for (const v of [this.avatar.view, this.parrot.view, this.markerThing.view, this.tap.view, this.petThing?.view]) v?.parent?.removeChild(v);
@@ -173,8 +178,8 @@ export class WorldEngine {
     this.ground = buildGround(map);
     const sparkleLayer = new Container();
     root.addChild(this.ground.water, sparkleLayer, this.ground.foam, this.ground.land, this.ground.fog);
-    if (kind === 'casino') {
-      const walls = C.buildWalls();
+    if (kind !== 'island') {
+      const walls = C.buildWalls(kind);
       root.addChild(walls.view);
       this.things.push(walls);
     }
@@ -204,7 +209,7 @@ export class WorldEngine {
     for (const p of map.props) {
       const t = this.makeProp(p.kind, p.seed);
       if (!t) continue;
-      this.add(t, p.gx, p.gy, p.size ? p.size * TH * 0.35 : p.kind === 'chandelier' ? 1e5 : 0);
+      this.add(t, p.gx, p.gy, p.size ? p.size * TH * 0.35 : p.kind === 'chandelier' || p.kind === 'lantern' ? 1e5 : 0);
       if (['ferris', 'lighthouse', 'volcano', 'temple'].includes(p.kind)) this.landmarks[p.kind] = { prop: p, thing: t };
       if (['palm', 'balloons', 'boat'].includes(p.kind)) this.pokeables.push({ prop: p, thing: t });
     }
@@ -215,8 +220,8 @@ export class WorldEngine {
         this.add(t, g.gx, g.gy, 2);
         this.gateViews.push({ zone: g.zone, view: t.view });
       }
-      for (const z of ['casino', 'jungle', 'volcano'] as ZoneKey[]) {
-        const [cx, cy] = map.centers[z];
+      for (const z of ['casino', 'jungle', 'volcano'] as IslandZone[]) {
+        const [cx, cy] = map.centers[z]!;
         const v = new Container();
         v.addChild(A.label(`🔒 Level ${LEVELS[z]}`, 26, 0xffe27a));
         const { x, y } = toScreen(cx, cy);
@@ -225,12 +230,24 @@ export class WorldEngine {
         this.entities.addChild(v);
         this.lockLabels.push({ zone: z, view: v });
       }
+    } else {
+      // A doorway further in that's still locked (the casino's stairs up to the VIP Salon).
+      for (const s of map.spots) {
+        if (s.kind !== 'enter' || !LEVELS[s.zone]) continue;
+        const v = new Container();
+        v.addChild(A.label(`🔒 Level ${LEVELS[s.zone]}`, 22, 0xffe27a));
+        const { x, y } = toScreen(s.gx, s.gy);
+        v.position.set(x, y - 225);
+        v.zIndex = 1e6;
+        this.entities.addChild(v);
+        this.lockLabels.push({ zone: s.zone, view: v });
+      }
     }
 
     // Where the player appears.
     let spawn = at ?? map.spawn;
-    if (!at && kind === 'island' && fromKind === 'casino') {
-      const door = map.spots.find((s) => s.kind === 'enter');
+    if (!at && fromKind) {
+      const door = map.spots.find((s) => s.kind === 'enter' && s.to === fromKind);
       if (door) spawn = { gx: door.ax, gy: door.ay };
     }
     Object.assign(this.player, { gx: spawn.gx, gy: spawn.gy, path: [], moving: false });
@@ -297,11 +314,12 @@ export class WorldEngine {
     this.focus = { x, y: y - 50, zoom: Math.min(1.7, this.defaultZoom() * 1.45) };
   }
 
-  /** Fast travel: the player appears at the zone's signpost (leaving the casino first if inside). */
+  /** Fast travel: the player appears at the zone's signpost (leaving a room first if inside); the VIP Salon is a room. */
   travel(zone: ZoneKey) {
+    if (zone === 'vip') return this.enterScene('vip');
     if (this.map.kind !== 'island') this.enterScene('island');
     const sign = this.map.spots.find((s) => s.kind === 'travel' && s.zone === zone);
-    const [gx, gy] = sign ? [sign.ax, sign.ay] : this.map.centers[zone];
+    const [gx, gy] = sign ? [sign.ax, sign.ay] : this.map.centers[zone] ?? [this.map.spawn.gx, this.map.spawn.gy];
     Object.assign(this.player, { gx, gy, path: [], moving: false });
     Object.assign(this.pet, { gx: gx - 0.6, gy: gy + 0.4 });
     this.pendingSpot = null;
@@ -464,6 +482,7 @@ export class WorldEngine {
       else if (p.kind === 'torch') glow(x, y - 74, 60, 0xff8a2a);
       else if (p.kind === 'lavapool') glow(x, y, 80, 0xff5a1f, 0.4);
       else if (p.kind === 'casino') glow(x, y + 20, 240, 0xffc6ff, 0.3);
+      else if (p.kind === 'tavern') glow(x, y - 30, 150, 0xffb347, 0.35);
       else if (p.kind === 'ferris') glow(x, y - 170, 170, 0xff9bc8, 0.22);
       else if (p.kind === 'volcano') glow(x, y - 264, 160, 0xff5a1f, 0.45);
       else if (p.kind === 'temple') glow(x, y - 80, 120, 0x3aff9e, 0.18);
@@ -572,6 +591,7 @@ export class WorldEngine {
       case 'lighthouse': return A.lighthouse();
       case 'ferris': return A.ferris();
       case 'casino': return A.casino();
+      case 'tavern': return R.tavernBuilding();
       case 'temple': return A.temple();
       case 'volcano': return A.volcano(seed);
       // Casino interior
@@ -588,6 +608,18 @@ export class WorldEngine {
       case 'cardtable': return C.cardTable(seed);
       case 'sofa': return C.sofa();
       case 'viptable': return C.vipTable();
+      // VIP Salon
+      case 'piano': return R.piano();
+      case 'champagne': return R.champagneTower();
+      // The Rusty Anchor
+      case 'barrel': return R.barrel(seed);
+      case 'woodstool': return R.woodStool();
+      case 'woodtable': return R.woodTable(seed);
+      case 'pirate': return R.pirateKeeper();
+      case 'hearth': return R.hearth();
+      case 'lantern': return R.lantern(seed);
+      case 'perch': return R.parrotPerch();
+      case 'chestdecor': return A.chest(false);
       default: return null;
     }
   }
@@ -598,6 +630,9 @@ export class WorldEngine {
         if (s.game === 'roulette') return A.rouletteTable();
         if (s.game === 'temple-doors') return A.templeGate();
         if (s.game === 'lava-crash') return A.lavaLookout();
+        if (s.game === 'island-reels') return R.reelsMachine(s.gx * 0.13 + s.gy * 0.07, this.map.kind === 'vip');
+        if (s.game === 'dragon-tiger') return R.dragonTigerTable(this.map.kind === 'vip');
+        if (s.game === 'pirate-dice') return R.diceTable(s.gx * 0.11);
         return A.stall(s.game!, s.label);
       case 'travel': return A.signpost();
       case 'daily': return A.chest(true);
@@ -605,8 +640,8 @@ export class WorldEngine {
       case 'wardrobe': return A.hut('wardrobe', 'WARDROBE');
       case 'cashier': return A.hut('cashier', 'CASHIER');
       case 'board': return s.id === 'tables-board' ? C.tablesBoard() : A.noticeBoard();
-      case 'enter': return C.casinoEntrance();
-      case 'exit': return C.exitArch();
+      case 'enter': return s.to === 'tavern' ? R.tavernDoorstep() : s.to === 'vip' ? R.stairsUp() : C.casinoEntrance();
+      case 'exit': return this.map.kind === 'vip' ? R.stairsDown() : this.map.kind === 'tavern' ? R.tavernExit() : C.exitArch();
       case 'fun': return { view: new Container() };
     }
   }
@@ -714,12 +749,16 @@ export class WorldEngine {
       }
     }
     if (!hit) hit = this.landmarkAt(local);
-    // Tapping the casino building itself walks to its door.
+    // Tapping a building itself (the casino, the tavern) walks to its door.
     if (!hit && this.map.kind === 'island') {
-      const b = this.map.props.find((p) => p.kind === 'casino');
-      if (b) {
+      for (const b of this.map.props) {
+        const box = BUILDINGS[b.kind];
+        if (!box) continue;
         const { x, y } = toScreen(b.gx, b.gy);
-        if (Math.abs(local.x - x) < 190 && local.y > y - 330 && local.y < y + 70) hit = this.map.spots.find((s) => s.kind === 'enter') ?? null;
+        if (Math.abs(local.x - x) < box[0] && local.y > y - box[1] && local.y < y + 70) {
+          hit = this.map.spots.find((s) => s.kind === 'enter' && s.to === b.kind) ?? null;
+          if (hit) break;
+        }
       }
     }
     const pg = toGrid(local.x, local.y);
@@ -869,7 +908,7 @@ export class WorldEngine {
     if (near) {
       const m = toScreen(near.gx, near.gy);
       const funTall: Record<string, number> = { 'fun-ferris': 330, 'fun-lighthouse': 280, 'fun-volcano': 340, 'fun-temple': 200 };
-      const tall = near.kind === 'fun' ? funTall[near.id] ?? 200 : { game: 160, travel: 100, chest: 80, daily: 80, enter: 110, exit: 190, board: 160, wardrobe: 160, cashier: 160 }[near.kind];
+      const tall = near.kind === 'fun' ? funTall[near.id] ?? 200 : { game: 160, travel: 100, chest: 80, daily: 80, enter: near.to === 'vip' ? 225 : 110, exit: this.map.kind === 'vip' ? 90 : 190, board: 160, wardrobe: 160, cashier: 160 }[near.kind];
       this.markerThing.view.position.set(m.x, m.y - tall);
       this.markerThing.view.zIndex = 1e6;
     }
@@ -915,5 +954,5 @@ export class WorldEngine {
   }
 }
 
-const LEVELS: Partial<Record<ZoneKey, number>> = { casino: 2, jungle: 3, volcano: 4 };
+const LEVELS: Partial<Record<ZoneKey, number>> = { casino: 2, jungle: 3, volcano: 4, vip: 5 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));

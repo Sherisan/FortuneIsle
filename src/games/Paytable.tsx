@@ -1,5 +1,7 @@
 import type { GameKey, Tier } from '../api/types.ts';
 import { useGame } from '../store/game.ts';
+import { DICE_ICON } from './PirateDice.tsx';
+import { REEL_ICON } from './IslandReels.tsx';
 import { SCRATCH_ICON } from './ScratchKiosk.tsx';
 
 const pct = (w: number, total: number) => `${((w / total) * 100).toFixed(w / total < 0.01 ? 2 : 1)}%`;
@@ -137,6 +139,59 @@ export function Paytable({ game }: { game: GameKey }) {
                 <tr key={x}><td>×{x}</td><td>{((0.96 / x) * 100).toFixed(x >= 100 ? 3 : 1)}%</td></tr>
               ))}
             </tbody>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'island-reels': {
+      const pt = meta.paytable as { tiers: Tier[] };
+      return (
+        <div className="paytable">
+          <p>One line, three reels. Three of a kind on the line wins that symbol’s prize. The prize is drawn first and the reels are dealt to show it, so the spin is only the reveal — a losing spin never shows three of a kind.</p>
+          <TierTable tiers={pt.tiers} name={(t) => (t.key === 'lose' ? 'No match' : `${REEL_ICON[t.key]} ×3`)} />
+          {common}
+        </div>
+      );
+    }
+    case 'dragon-tiger': {
+      const pt = meta.paytable as { ranks: number; pays: number; tie: number };
+      const r = pt.ranks;
+      const side = (r * (r - 1)) / 2 / (r * r), tie = 1 / r;
+      return (
+        <div className="paytable">
+          <p>One card is dealt to the Dragon and one to the Tiger from an endless deck. Back the higher card, or a tie. Ace is low, king is high; suits don’t count. A tie loses Dragon and Tiger bets.</p>
+          <table className="pay">
+            <thead><tr><th>Bet</th><th>Pays</th><th>Chance</th></tr></thead>
+            <tbody>
+              <tr><td>🐉 Dragon higher</td><td>×{pt.pays}</td><td>{(side * 100).toFixed(2)}%</td></tr>
+              <tr><td>🐯 Tiger higher</td><td>×{pt.pays}</td><td>{(side * 100).toFixed(2)}%</td></tr>
+              <tr><td>🤝 Tie</td><td>×{pt.tie}</td><td>{(tie * 100).toFixed(2)}%</td></tr>
+            </tbody>
+            <tfoot><tr><td colSpan={3}>Return to player: {(side * pt.pays * 100).toFixed(2)}% on Dragon or Tiger, {(tie * pt.tie * 100).toFixed(2)}% on a tie.</td></tr></tfoot>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'pirate-dice': {
+      const pt = meta.paytable as { faces: string[]; dice: number; pays: number[] };
+      const f = pt.faces.length;
+      const n = pt.dice;
+      const choose = (k: number) => [1, 3, 3, 1][k] ?? 1; // C(3, k)
+      const chance = (k: number) => (choose(k) * (f - 1) ** (n - k)) / f ** n;
+      const rtp = pt.pays.reduce((s, m, k) => s + m * chance(k), 0);
+      return (
+        <div className="paytable">
+          <p>Crown and anchor, pirate style. Pick one of the {f} faces ({pt.faces.map((x) => DICE_ICON[x]).join(' ')}), then {n} fair dice are rolled. You’re paid by how many show your face.</p>
+          <table className="pay">
+            <thead><tr><th>Your face shows</th><th>Pays</th><th>Chance</th></tr></thead>
+            <tbody>
+              {[3, 2, 1, 0].map((k) => (
+                <tr key={k}><td>{k === 0 ? 'None' : `${k} of ${n}`}</td><td>{pt.pays[k] > 0 ? `×${pt.pays[k]}` : '—'}</td><td>{(chance(k) * 100).toFixed(2)}%</td></tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td colSpan={3}>Return to player: Σ chance × pays = {(rtp * 100).toFixed(2)}%</td></tr></tfoot>
           </table>
           {common}
         </div>

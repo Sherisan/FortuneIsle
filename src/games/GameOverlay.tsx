@@ -4,6 +4,9 @@ import { freePlaysIn, money, useGame } from '../store/game.ts';
 import { GAME_ICON } from '../ui/Panels.tsx';
 import { CoconutShy } from './CoconutShy.tsx';
 import { CupShuffle } from './CupShuffle.tsx';
+import { DragonTiger } from './DragonTiger.tsx';
+import { IslandReels } from './IslandReels.tsx';
+import { PirateDice } from './PirateDice.tsx';
 import { DuckPond } from './DuckPond.tsx';
 import { HighStriker } from './HighStriker.tsx';
 import { LavaCrash } from './LavaCrash.tsx';
@@ -23,6 +26,9 @@ const GAMES: Record<GameKey, () => ReactNode> = {
   roulette: () => <Roulette />,
   'temple-doors': () => <TempleDoors />,
   'lava-crash': () => <LavaCrash />,
+  'island-reels': () => <IslandReels />,
+  'dragon-tiger': () => <DragonTiger />,
+  'pirate-dice': () => <PirateDice />,
 };
 
 /** The spring-animated card a stall opens; the world stays loaded (and paused) behind it. */

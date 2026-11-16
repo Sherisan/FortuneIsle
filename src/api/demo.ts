@@ -66,6 +66,9 @@ export function createDemoApi(): IslandApi {
       case 'temple-doors': return r.level === R.TEMPLE_LEVELS;
       case 'lava-crash': return m >= 10;
       case 'roulette': return (r.choice?.bets ?? []).some((b: { type: string; numbers: number[] }) => b.type === 'straight' && b.numbers[0] === r.outcome?.pocket);
+      case 'island-reels': return m === Math.max(...R.REELS_TABLE.map((t) => t.multiplier));
+      case 'dragon-tiger': return m === R.DT_TIE;
+      case 'pirate-dice': return m === R.DICE_PAYS[R.DICE_PAYS.length - 1];
     }
   };
 
@@ -208,6 +211,28 @@ export function createDemoApi(): IslandApi {
           counts[s]++;
         }
         return [R.SCRATCH_TABLE[tier].multiplier, null, { card, symbol: tier > 0 ? R.SCRATCH_TABLE[tier].key : null }];
+      }
+      case 'island-reels': {
+        const tier = weighted(R.REELS_TABLE);
+        const S = R.REEL_SYMBOLS;
+        let reels: string[];
+        if (tier > 0) reels = Array(3).fill(R.REELS_TABLE[tier].key);
+        else {
+          const a = S[pick(S.length)], b = S[pick(S.length)];
+          const pool = a === b ? S.filter((s) => s !== a) : S;
+          reels = [a, b, pool[pick(pool.length)]];
+        }
+        return [R.REELS_TABLE[tier].multiplier, null, { reels, symbol: tier > 0 ? R.REELS_TABLE[tier].key : null }];
+      }
+      case 'dragon-tiger': {
+        const dr = pick(13), ds = pick(4), tr = pick(13), ts = pick(4);
+        const ch = body.choice!;
+        return [R.dtMultiplier(ch, dr, tr), { side: R.DT_SIDES[ch] }, { dragon: { rank: dr, suit: ds }, tiger: { rank: tr, suit: ts }, winner: dr > tr ? 'dragon' : tr > dr ? 'tiger' : 'tie' }];
+      }
+      case 'pirate-dice': {
+        const dice = [pick(6), pick(6), pick(6)];
+        const matches = dice.filter((d) => d === body.choice).length;
+        return [R.DICE_PAYS[matches], { face: R.DICE_FACES[body.choice!] }, { dice: dice.map((d) => R.DICE_FACES[d]), matches }];
       }
       case 'roulette': {
         const pocket = pick(37);
