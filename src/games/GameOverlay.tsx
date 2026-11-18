@@ -44,7 +44,7 @@ export function GameOverlay() {
   );
 }
 
-/** Header (name, RTP/info, close), the stage, and the footer. Shared by every game. */
+/** Header (name, rules, close), the stage, and the footer. Shared by every game. */
 export function Shell({ game, children, footer, live }: { game: GameKey; children: ReactNode; footer?: ReactNode; live?: boolean }) {
   const meta = useGame((s) => s.meta(game));
   const close = useGame((s) => s.closeGame);
@@ -59,7 +59,7 @@ export function Shell({ game, children, footer, live }: { game: GameKey; childre
         <span className="gh-icon">{GAME_ICON[game]}</span>
         <h2>{meta?.name}</h2>
         <button className={`rtp-btn${info ? ' on' : ''}`} onClick={() => setInfo(!info)} title="Paytable and rules">
-          ⓘ RTP {meta ? (meta.rtp * 100).toFixed(game === 'roulette' ? 1 : 0) : 96}%
+          ⓘ Rules
         </button>
         <button className="icon-btn" onClick={close} disabled={live || roundLive} aria-label="Close" title={live || roundLive ? 'Finish the round first' : 'Back to the island'}>
           ✕

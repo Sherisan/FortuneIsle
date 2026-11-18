@@ -75,7 +75,7 @@ function Menu() {
       {item('🧢', 'Wardrobe', () => setPanel('wardrobe'), 'Hats, outfits, pets and win effects')}
       {item('🧾', 'Round history', () => setPanel('history'), 'Your recent rounds and session totals')}
       {item('🗺️', 'Fast travel', () => setPanel('travel'), 'Jump to any open zone')}
-      {item('📜', 'Paytables & rules', () => setPanel('paytables'), 'Every game’s odds and RTP')}
+      {item('📜', 'Paytables & rules', () => setPanel('paytables'), 'Every game’s odds and rules')}
       {item('🔐', 'Provably fair', () => setPanel('fair'), 'Seeds and how to verify a round')}
       {item('🛡️', 'Responsible gambling', () => setPanel('rg'), 'Limits, reality checks, self-exclusion')}
       {item(muted ? '🔇' : '🔊', muted ? 'Sound: off' : 'Sound: on', toggleMute)}
@@ -222,7 +222,7 @@ function Rg() {
       </label>
       <button className="btn btn-mint" onClick={() => void save()}>Save limits</button>
       <div className="rg-help">
-        <p><b>18+ only.</b> Every game here has a fixed return to player: 96% (roulette 97.3%). Over time you will lose more than you win. Power-ups, XP and cosmetics never change the odds.</p>
+        <p><b>18+ only.</b> Every game here has fixed odds. Over time you will lose more than you win. Power-ups, XP and cosmetics never change the odds.</p>
         <p>Need a break? Close the game, or ask the casino’s support team to self-exclude you. Free, confidential help: <a href="https://responsiblegambling.org.za" target="_blank" rel="noreferrer">South African Responsible Gambling Foundation</a> · 0800 006 008.</p>
       </div>
     </div>
@@ -270,7 +270,6 @@ function Board() {
               {info.games.filter((g) => g.zone === z.key).map((g) => (
                 <li key={g.key}>
                   <span>{GAME_ICON[g.key]} {g.name} {INDOORS[g.key] && <small>· {INDOORS[g.key]}</small>}</span>
-                  <b>RTP {(g.rtp * 100).toFixed(g.key === 'roulette' ? 1 : 0)}%</b>
                 </li>
               ))}
               {z.key === 'vip' && (

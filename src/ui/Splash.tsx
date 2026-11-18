@@ -29,7 +29,7 @@ export function Splash() {
         )}
         {phase === 'fatal' && <p className="fatal">{fatal}</p>}
         <p className="legal">
-          <b>18+</b> · Real-money games with a fixed, certified return (96% · roulette 97.3%) · Play responsibly
+          <b>18+</b> · Real-money games · Play responsibly
         </p>
       </div>
     </div>

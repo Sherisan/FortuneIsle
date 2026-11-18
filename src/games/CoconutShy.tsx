@@ -74,7 +74,8 @@ export function CoconutShy() {
             );
           })}
         </div>
-        {phase === 'throw' && target != null && <span className="ball" style={{ ['--tx' as string]: `${(target - 2) * 19}%` }} />}
+        {/* --x is the target coconut's centre as a share of the stall's width (5 slots, 18% wide, spread over the middle 92%). */}
+        {phase === 'throw' && target != null && <span className="ball" style={{ ['--x' as string]: `${50 + (target - 2) * 18.86}%` }} />}
       </div>
       <Result round={phase === 'reveal' ? round : null} text={phase === 'idle' ? `Classic: 1 in 5 pays ×4.8 · Golden: 18% win, up to ×20` : undefined} />
     </Shell>

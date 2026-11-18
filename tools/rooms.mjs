@@ -126,7 +126,7 @@ await ev(`window.__fi.useGame.getState().setPanel(null)`);
 for (const g of ['island-reels', 'dragon-tiger', 'pirate-dice']) {
   await ev(`window.__fi.useGame.getState().openGame('${g}')`);
   await sleep(500);
-  await page.getByRole('button', { name: /RTP/ }).click();
+  await page.getByRole('button', { name: /Rules/ }).click();
   await sleep(400);
   await shot(`15-paytable-${g}`);
   await ev(`window.__fi.useGame.getState().closeGame()`);

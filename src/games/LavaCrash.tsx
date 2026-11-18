@@ -154,7 +154,7 @@ export function LavaCrash() {
         </div>
         {erupted && <div className="eruption" />}
       </div>
-      <Result round={r ?? null} text={live ? 'Cash out before it blows!' : 'Chance to reach ×x is 0.96 ÷ x · max ×500'} />
+      <Result round={r ?? null} text={live ? 'Cash out before it blows!' : 'Cash out any time · max ×500'} />
     </Shell>
   );
 }

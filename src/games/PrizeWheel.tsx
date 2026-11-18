@@ -67,6 +67,8 @@ export function PrizeWheel() {
     >
       <div className="wheel-wrap">
         <div className="wheel-pointer" />
+        {/* The clip keeps the turning square's corners from overflowing the stage (which flashed a scrollbar and shifted the wheel). */}
+        <div className="wheel-clip">
         <svg className="wheel" viewBox="-160 -160 320 320" style={{ transform: `rotate(${rot}deg)`, transition: spinning ? 'transform 4.2s cubic-bezier(.12,.7,.1,1)' : 'none' }}>
           <circle r="156" fill="#2c1d3f" />
           {segs.map((m, i) => {
@@ -96,6 +98,7 @@ export function PrizeWheel() {
           <circle r="26" fill="#ffd23f" stroke="#2c1d3f" strokeWidth="4" />
           <circle r="9" fill="#ff5b6e" stroke="#2c1d3f" strokeWidth="3" />
         </svg>
+        </div>
       </div>
       <Result round={round} text={spinning ? 'Round and round…' : 'Every segment is equally likely · top prize ×5.2'} />
     </Shell>

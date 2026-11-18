@@ -20,6 +20,7 @@ export function DuckPond() {
   const els = useRef<(HTMLButtonElement | null)[]>([]);
   const angle = useRef(0);
   const moving = useRef(true);
+  const seq = useRef(0);
 
   useEffect(() => {
     let raf = 0;
@@ -31,7 +32,8 @@ export function DuckPond() {
       els.current.forEach((el, i) => {
         if (!el) return;
         const a = angle.current + (i / DUCKS) * Math.PI * 2;
-        const x = 50 + Math.cos(a) * 40, y = 50 + Math.sin(a) * 30;
+        // The orbit sits a little low so a duck at the back still has room above it for its tag.
+        const x = 50 + Math.cos(a) * 40, y = 55 + Math.sin(a) * 28;
         const depth = (Math.sin(a) + 1) / 2;
         const bob = Math.sin(now / 300 + i) * 3;
         el.style.left = `${x}%`;
@@ -49,15 +51,16 @@ export function DuckPond() {
 
   const hook = async (i: number) => {
     if (phase === 'hook' || busy) return;
-    if (phase === 'reveal') {
-      setValues(null);
-      setRound(null);
-    }
+    // Each hook gets a number, so a previous round's timers can't restart the ducks in the middle of a new one.
+    const my = ++seq.current;
+    setValues(null);
+    setRound(null);
     moving.current = false;
     setPicked(i);
     setPhase('hook');
     sound.play('whoosh');
     const [s] = await Promise.all([bet({ game: 'duck-pond', stake, choice: i }), wait(700)]);
+    if (my !== seq.current) return;
     if (!s?.round) {
       setPhase('swim');
       setPicked(null);
@@ -71,6 +74,13 @@ export function DuckPond() {
     await wait(400);
     finish(s);
     await wait(1400);
+    if (my !== seq.current) return;
+    // Put the multipliers away first, then let the ducks swim on (the result line stays up).
+    setValues(null);
+    setPicked(null);
+    setPhase('swim');
+    await wait(350);
+    if (my !== seq.current) return;
     moving.current = true;
   };
 
@@ -105,7 +115,7 @@ export function DuckPond() {
           );
         })}
       </div>
-      <Result round={phase === 'reveal' ? round : null} text={phase === 'swim' ? 'Up to ×20 under a duck' : phase === 'hook' ? 'Hooked one…' : undefined} />
+      <Result round={phase === 'hook' ? null : round} text={phase === 'hook' ? 'Hooked one…' : 'Up to ×20 under a duck'} />
     </Shell>
   );
 }

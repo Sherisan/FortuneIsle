@@ -9,7 +9,6 @@ const total = (t: Tier[]) => t.reduce((s, x) => s + x.weight, 0);
 
 function TierTable({ tiers, name = (t: Tier) => `×${t.multiplier}` }: { tiers: Tier[]; name?: (t: Tier) => string }) {
   const sum = total(tiers);
-  const rtp = tiers.reduce((s, t) => s + t.multiplier * t.weight, 0) / sum;
   return (
     <table className="pay">
       <thead>
@@ -24,14 +23,11 @@ function TierTable({ tiers, name = (t: Tier) => `×${t.multiplier}` }: { tiers: 
           </tr>
         ))}
       </tbody>
-      <tfoot>
-        <tr><td colSpan={3}>Return to player: Σ chance × pays = {(rtp * 100).toFixed(2)}%</td></tr>
-      </tfoot>
     </table>
   );
 }
 
-/** Rules, odds and RTP for one game, from the paytable the server sent (api/island/info). */
+/** Rules and odds for one game, from the paytable the server sent (api/island/info). */
 export function Paytable({ game }: { game: GameKey }) {
   const meta = useGame((s) => s.meta(game));
   const info = useGame((s) => s.info);
@@ -48,7 +44,7 @@ export function Paytable({ game }: { game: GameKey }) {
       const pt = meta.paytable as { coconuts: number; classic: number; golden: Tier[] };
       return (
         <div className="paytable">
-          <p><b>Classic:</b> one of {pt.coconuts} coconuts hides the prize. Pick one and throw — hit it and win <b>×{pt.classic}</b>. Chance 1 in {pt.coconuts}. RTP {((pt.classic / pt.coconuts) * 100).toFixed(0)}%.</p>
+          <p><b>Classic:</b> one of {pt.coconuts} coconuts hides the prize. Pick one and throw — hit it and win <b>×{pt.classic}</b>. Chance 1 in {pt.coconuts}.</p>
           <p><b>Golden Coconut:</b> the coconut you pick wins ×3.5 or, rarely, the Golden Coconut ×20.</p>
           <TierTable tiers={pt.golden} name={(t) => (t.key === 'golden' ? '🌟 Golden coconut' : t.key === 'prize' ? '🥥 Prize' : 'Miss')} />
           {common}
@@ -59,7 +55,7 @@ export function Paytable({ game }: { game: GameKey }) {
       const pt = meta.paytable as { cups: number; pays: number };
       return (
         <div className="paytable">
-          <p>Watch the shuffle, then pick a cup. Find the ball and win <b>×{pt.pays}</b>. Chance 1 in {pt.cups}. RTP {((pt.pays / pt.cups) * 100).toFixed(0)}%.</p>
+          <p>Watch the shuffle, then pick a cup. Find the ball and win <b>×{pt.pays}</b>. Chance 1 in {pt.cups}.</p>
           <p><b>The shuffle is decorative.</b> The server places the ball after you pick, so following the cups doesn’t help (or hurt).</p>
           {common}
         </div>
@@ -120,7 +116,6 @@ export function Paytable({ game }: { game: GameKey }) {
                 <tr key={i}><td>{i + 1}</td><td>×{m}</td><td>{((2 / 3) ** (i + 1) * 100).toFixed(2)}%</td></tr>
               ))}
             </tbody>
-            <tfoot><tr><td colSpan={3}>Level n pays 0.96 × 1.5ⁿ, so every cash-out point returns 96%.</td></tr></tfoot>
           </table>
           {common}
         </div>
@@ -131,7 +126,7 @@ export function Paytable({ game }: { game: GameKey }) {
       return (
         <div className="paytable">
           <p>The lava climbs from ×1.00. Cash out before the volcano erupts — or set an auto cash-out. Reach ×{pt.max} and you cash out automatically.</p>
-          <p>The eruption point is drawn so the chance it reaches ×x is 0.96 ÷ x (4% of climbs erupt at once). Every cash-out target returns 96%.</p>
+          <p>The table shows the chance the lava reaches each cash-out point before the volcano erupts.</p>
           <table className="pay">
             <thead><tr><th>Cash out at</th><th>Chance</th></tr></thead>
             <tbody>
@@ -168,7 +163,6 @@ export function Paytable({ game }: { game: GameKey }) {
               <tr><td>🐯 Tiger higher</td><td>×{pt.pays}</td><td>{(side * 100).toFixed(2)}%</td></tr>
               <tr><td>🤝 Tie</td><td>×{pt.tie}</td><td>{(tie * 100).toFixed(2)}%</td></tr>
             </tbody>
-            <tfoot><tr><td colSpan={3}>Return to player: {(side * pt.pays * 100).toFixed(2)}% on Dragon or Tiger, {(tie * pt.tie * 100).toFixed(2)}% on a tie.</td></tr></tfoot>
           </table>
           {common}
         </div>
@@ -180,7 +174,6 @@ export function Paytable({ game }: { game: GameKey }) {
       const n = pt.dice;
       const choose = (k: number) => [1, 3, 3, 1][k] ?? 1; // C(3, k)
       const chance = (k: number) => (choose(k) * (f - 1) ** (n - k)) / f ** n;
-      const rtp = pt.pays.reduce((s, m, k) => s + m * chance(k), 0);
       return (
         <div className="paytable">
           <p>Crown and anchor, pirate style. Pick one of the {f} faces ({pt.faces.map((x) => DICE_ICON[x]).join(' ')}), then {n} fair dice are rolled. You’re paid by how many show your face.</p>
@@ -191,7 +184,6 @@ export function Paytable({ game }: { game: GameKey }) {
                 <tr key={k}><td>{k === 0 ? 'None' : `${k} of ${n}`}</td><td>{pt.pays[k] > 0 ? `×${pt.pays[k]}` : '—'}</td><td>{(chance(k) * 100).toFixed(2)}%</td></tr>
               ))}
             </tbody>
-            <tfoot><tr><td colSpan={3}>Return to player: Σ chance × pays = {(rtp * 100).toFixed(2)}%</td></tr></tfoot>
           </table>
           {common}
         </div>
@@ -202,7 +194,7 @@ export function Paytable({ game }: { game: GameKey }) {
       const names: Record<string, string> = { straight: 'Straight (1 number)', column: 'Column', dozen: 'Dozen', evenMoney: 'Red/black, odd/even, 1–18/19–36' };
       return (
         <div className="paytable">
-          <p>European single-zero roulette. Place chips, then spin. RTP 97.3% (36/37) on every bet.</p>
+          <p>European single-zero roulette. Place chips, then spin.</p>
           <table className="pay">
             <thead><tr><th>Bet</th><th>Pays</th></tr></thead>
             <tbody>

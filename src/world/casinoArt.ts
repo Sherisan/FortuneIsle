@@ -368,7 +368,7 @@ export function tablesBoard(): A.Thing {
   const t1 = neon('TABLES', 15, 0x2fc36f);
   t1.anchor.set(0.5);
   t1.position.set(0, -108);
-  const t2 = new Text({ text: 'Roulette 97.3%\nDragon Tiger 96%\nReels 96%', style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: 11, fill: 0xffe27a, align: 'center', lineHeight: 12 } });
+  const t2 = new Text({ text: 'Roulette\nDragon Tiger\nIsland Reels', style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: 11, fill: 0xffe27a, align: 'center', lineHeight: 12 } });
   t2.resolution = 2;
   t2.anchor.set(0.5);
   t2.position.set(0, -78);

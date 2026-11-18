@@ -11,7 +11,7 @@ const ENTRANCES: Partial<Record<SceneKey, { marquee: string; title: string; sub:
   casino: {
     marquee: 'GRAND CASINO',
     title: 'Welcome to the Grand Casino',
-    sub: 'Roulette 97.3% · Dragon Tiger & Island Reels 96%',
+    sub: 'Roulette · Dragon Tiger · Island Reels',
     items: ['🎰 Two roulette tables', '🍒 Island Reels', '🐉 Dragon Tiger', '💎 VIP Salon upstairs'],
     go: 'Step inside',
   },
@@ -25,7 +25,7 @@ const ENTRANCES: Partial<Record<SceneKey, { marquee: string; title: string; sub:
   tavern: {
     marquee: '⚓ RUSTY ANCHOR',
     title: 'The Rusty Anchor',
-    sub: 'Pirate Dice · crown & anchor · RTP 96%',
+    sub: 'Pirate Dice · crown & anchor',
     items: ['🎲 Two Pirate Dice tables', '🍺 The bar', '🔥 A roaring hearth', '📜 Notice board'],
     go: 'Push the door',
   },

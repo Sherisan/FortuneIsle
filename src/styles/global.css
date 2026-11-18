@@ -384,8 +384,12 @@ table.pay { width: 100%; border-collapse: separate; border-spacing: 0; border: 3
 .prize-pop.missed { background: #fff; color: var(--plum); font-size: 14px; }
 .prize-pop.empty { background: #fff; color: var(--bad); font-size: 15px; }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 20px) scale(.5); } }
-.ball { position: absolute; left: 50%; bottom: -20px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ff5b6e 55%, #c22); border: 3px solid var(--plum); z-index: 5; animation: throw .65s cubic-bezier(.3,.1,.6,1) forwards; }
-@keyframes throw { 0% { transform: translate(0, 0) scale(1.5); } 60% { transform: translate(calc(var(--tx) * 2.6), -170px) scale(.9); } 100% { transform: translate(calc(var(--tx) * 4.4), -150px) scale(.75); } }
+.ball { position: absolute; left: var(--x, 50%); bottom: 122px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ff5b6e 55%, #c22); border: 3px solid var(--plum); z-index: 5; animation: throw .65s linear forwards; }
+@keyframes throw {
+  0% { left: 50%; bottom: -20px; transform: scale(1.5); animation-timing-function: cubic-bezier(.3,.6,.6,1); }
+  60% { left: calc(50% + (var(--x, 50%) - 50%) * .62); bottom: 168px; transform: scale(.9); animation-timing-function: cubic-bezier(.4,0,.8,.6); }
+  100% { left: var(--x, 50%); bottom: 122px; transform: scale(.75); }
+}
 
 /* Cup Shuffle */
 .cups { position: relative; height: 210px; border-radius: 20px; border: 3px solid var(--plum); overflow: hidden; background: linear-gradient(#4d2f7a, #2c1d3f); }
@@ -412,15 +416,16 @@ table.pay { width: 100%; border-collapse: separate; border-spacing: 0; border: 3
 .cup-ball { position: absolute; bottom: 52px; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8c2, var(--gold) 55%, #d89a12); border: 3px solid var(--plum); z-index: 2; }
 
 /* Prize Wheel */
-.wheel-wrap { position: relative; width: min(330px, 86vw); aspect-ratio: 1; margin: 0 auto; }
-.wheel { width: 100%; height: 100%; filter: drop-shadow(0 6px 0 var(--plum)); }
+.wheel-wrap { position: relative; width: min(330px, 100%); aspect-ratio: 1; margin: 0 auto; }
+.wheel-clip { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; filter: drop-shadow(0 6px 0 var(--plum)); }
+.wheel { display: block; width: 100%; height: 100%; }
 .wheel-label { font: 700 15px var(--font); paint-order: stroke; stroke: rgba(0,0,0,.25); stroke-width: 2px; }
 .wheel .hit path { filter: brightness(1.3); }
 .wheel-pointer { position: absolute; top: -10px; left: 50%; margin-left: -18px; width: 36px; height: 44px; z-index: 2; background: var(--coral); clip-path: polygon(0 0, 100% 0, 50% 100%); filter: drop-shadow(0 0 0 var(--plum)); }
 .wheel-pointer::after { content: ''; position: absolute; inset: 5px 8px 12px; background: rgba(255,255,255,.4); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 
 /* Duck Pond */
-.pond { position: relative; height: 250px; border-radius: 50% / 40%; border: 4px solid var(--plum); overflow: hidden; background: #8a5a33; }
+.pond { position: relative; height: 250px; border-radius: 50% / 40%; border: 4px solid var(--plum); background: #8a5a33; }
 .pond-water { position: absolute; inset: 14px; border-radius: 50% / 40%; background: radial-gradient(ellipse, #7fe0ff, #2ea7e8 70%, #1b8cc2); border: 3px solid var(--plum); }
 .pond-water::after { content: ''; position: absolute; inset: 22% 18%; border-radius: 50%; border: 3px dashed rgba(255,255,255,.35); animation: spin 18s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -450,10 +455,26 @@ table.pay { width: 100%; border-collapse: separate; border-spacing: 0; border: 3
 .tier::before { content: ''; position: absolute; left: -96px; width: 96px; top: 50%; border-top: 2px dashed rgba(44,29,63,.4); }
 .tier.lit span { background: var(--gold); animation: pop .4s cubic-bezier(.3,1.8,.5,1); }
 .puck { position: absolute; left: 50%; width: 30px; height: 18px; margin-left: -15px; transform: translateY(50%); border-radius: 8px; background: linear-gradient(#ff6b7a, #c22); border: 3px solid var(--plum); z-index: 2; }
-.hammer { position: absolute; left: calc(50% - 120px); bottom: 26px; font-size: 52px; transform-origin: 80% 80%; transform: rotate(-30deg); transition: transform .2s; }
-.hammer.swing { animation: swing .42s cubic-bezier(.6,0,.4,1) both; }
-@keyframes swing { 0% { transform: rotate(-30deg); } 40% { transform: rotate(-80deg); } 100% { transform: rotate(40deg) translate(20px, 4px); } }
-.pad { position: absolute; bottom: 14px; left: 50%; width: 70px; margin-left: -35px; height: 16px; border-radius: 6px; background: #8a5a33; border: 3px solid var(--plum); }
+/* After each result the puck drops back to the base and bounces once. --from is the height it reached, --bounce how high
+   it bounces; HighStriker sets both, and a duration that scales with the drop. */
+.puck.fall { animation: puck-fall .8s both; }
+@keyframes puck-fall {
+  0% { bottom: var(--from); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  72% { bottom: 2%; animation-timing-function: cubic-bezier(0,.5,.5,1); }
+  86% { bottom: var(--bounce); animation-timing-function: cubic-bezier(.5,0,1,.5); }
+  100% { bottom: 2%; }
+}
+/* The mallet pivots at its grip (centre - 68px, 52px up). Swung flat (90deg), its head (the last 24px of the 80px
+   handle, 46px across) is centred over the pad and its face meets the pad's top, 30px up. Move them together. */
+.hammer { position: absolute; left: calc(50% - 74px); bottom: 52px; z-index: 3; width: 12px; height: 80px; transform-origin: 50% 100%; transform: rotate(-25deg); transition: transform .35s ease-out; border: 3px solid var(--plum); border-radius: 6px; background: linear-gradient(90deg, #e0a868, #a86c34); }
+.hammer::before { content: ''; position: absolute; top: -3px; left: 50%; width: 46px; height: 24px; margin-left: -23px; border: 3px solid var(--plum); border-radius: 7px; background: linear-gradient(#f1f4f9, #9aa6b6); }
+.hammer.swing { animation: swing .42s cubic-bezier(.6,0,.4,1) both; transition: none; }
+.hammer.down { transform: rotate(90deg); transition: none; }
+@keyframes swing { 0% { transform: rotate(-25deg); } 40% { transform: rotate(-70deg); } 100% { transform: rotate(90deg); } }
+.pad { position: absolute; bottom: 14px; left: 50%; width: 70px; margin-left: -35px; height: 16px; border-radius: 6px; background: linear-gradient(#ff6b7a, #c22); border: 3px solid var(--plum); }
+/* The hit flashes a gold ring instead of squashing, so the pad stays in contact with the hammer head. */
+.pad.hit { animation: pad-hit .45s ease-out; }
+@keyframes pad-hit { 0% { filter: brightness(1.5); box-shadow: 0 0 0 6px rgba(255,210,63,.9); } 100% { box-shadow: 0 0 0 18px rgba(255,210,63,0); } }
 
 /* Scratch Kiosk */
 .scratch { display: flex; justify-content: center; }

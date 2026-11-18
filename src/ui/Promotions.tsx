@@ -109,7 +109,7 @@ export function Promotions({ compact }: { compact?: boolean }) {
           </ul>
         </section>
       )}
-      <p className="hint">Promotion prizes are paid from each promotion’s own budget — they never change the games’ RTP. Free plays don’t count towards promotions.</p>
+      <p className="hint">Promotion prizes are paid from each promotion’s own budget — they never change the games’ odds. Free plays don’t count towards promotions.</p>
     </div>
   );
 }

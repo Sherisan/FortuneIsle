@@ -116,7 +116,7 @@ export function TempleDoors() {
           </div>
         </div>
       </div>
-      <Result round={ended?.round ?? null} text={live ? (level === 0 ? 'Choose wisely…' : `Holding ×${live.temple?.now}`) : 'Each level: ×1.5 more · RTP 96% at any cash-out'} />
+      <Result round={ended?.round ?? null} text={live ? (level === 0 ? 'Choose wisely…' : `Holding ×${live.temple?.now}`) : 'Each level: ×1.5 more · cash out any time'} />
     </Shell>
   );
 }
