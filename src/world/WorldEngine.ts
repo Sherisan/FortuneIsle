@@ -3,11 +3,14 @@ import type { IslandZone, ZoneKey } from '../api/types.ts';
 import * as A from './art.ts';
 import * as C from './casinoArt.ts';
 import { buildGround, type GroundLayers } from './ground.ts';
-import { Ambient, Particles } from './fun.ts';
-import { buildInterior } from './interior.ts';
+import { Ambient, CloudSea, Particles, Snowfall } from './fun.ts';
+import { buildInterior, type InteriorKind } from './interior.ts';
+import { buildIsle } from './isles.ts';
+import * as I from './islesArt.ts';
 import * as R from './roomsArt.ts';
 import { sound } from '../ui/sound.ts';
-import { buildMap, findPath, idx, inside, nearestWalkable, TH, toGrid, toScreen, type Cell, type Prop, type SceneKey, type Spot, type WorldMap } from './map.ts';
+import { DIAMOND_SEGMENTS, GEMS } from '../api/rules.ts';
+import { buildMap, findPath, idx, inside, isIsle, nearestWalkable, TH, toGrid, toScreen, type Cell, type Prop, type SceneKey, type Spot, type WorldMap } from './map.ts';
 
 extensions.add(CullerPlugin);
 
@@ -29,15 +32,24 @@ export interface WorldCallbacks {
   onScene(scene: SceneKey): void;
   /** A landmark show in progress (a caption for the HUD), or null when it ends. */
   onCinematic(caption: string | null): void;
+  /** A secret found (an easter egg: nothing to do with money). */
+  onSecret(id: string): void;
 }
 
 const SPEED = 4.6; // tiles per second
 const NEAR = 1.75; // tiles
 const DOOR_FIRE = 1.5; // walk this close to a doorway and it opens
 const DOOR_REARM = 2.3;
-const BACKGROUND: Record<SceneKey, number> = { island: 0x1b8cc2, casino: 0x1a0f24, vip: 0x0d0a1f, tavern: 0x1f140c };
+const BACKGROUND: Record<SceneKey, number> = { island: 0x1b8cc2, casino: 0x1a0f24, vip: 0x0d0a1f, tavern: 0x1f140c, lagoon: 0x1b8cc2, frost: 0x28688c, sky: I.BACK_SKY };
 /** Buildings on the island you walk into: tapping one walks to its door. Half-width and height of the tap box. */
 const BUILDINGS: Record<string, [number, number]> = { casino: [190, 330], tavern: [130, 230] };
+/** Things you can tap for a little show (and some hide a secret): [half-width, top, bottom] of the tap box round the foot. */
+const POKE_BOX: Record<string, [number, number, number]> = {
+  shipwreck: [70, -110, 16], clam: [40, -44, 10], penguin: [22, -48, 8], yetipine: [44, -130, 10], snowman: [28, -100, 8],
+  moon: [70, -290, -150], bottle: [26, -30, 10],
+};
+/** The Konami code, for a secret. */
+const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
 
 export class WorldEngine {
   private app = new Application();
@@ -86,6 +98,17 @@ export class WorldEngine {
   private timers: { at: number; fn: () => void }[] = [];
   private cooldown = new Map<string, number>();
   private shakeUntil = 0;
+  // The isles' weather, their shows and the secrets (all cosmetic).
+  private snow: Snowfall | null = null;
+  private clouds: CloudSea | null = null;
+  private aurora: { t0: number; layer: Container; bands: Graphics } | null = null;
+  private rainbowArc: { t0: number; g: Graphics } | null = null;
+  private krakens: ReturnType<typeof I.kraken>[] = [];
+  private seaTaps: number[] = [];
+  private penguinTaps = new Map<Prop, number>();
+  private keyTrail: string[] = [];
+  private rainbowParrot = -100;
+  private atPot = false;
 
   private constructor(
     private host: HTMLElement,
@@ -150,7 +173,7 @@ export class WorldEngine {
    */
   enterScene(kind: SceneKey, at?: { gx: number; gy: number }) {
     const fromKind = this.map?.kind;
-    const map = (this.maps[kind] ??= kind === 'island' ? buildMap() : buildInterior(kind));
+    const map = (this.maps[kind] ??= kind === 'island' ? buildMap() : isIsle(kind) ? buildIsle(kind) : buildInterior(kind as InteriorKind));
 
     // Keep the persistent entities; throw away the old scene.
     for (const v of [this.avatar.view, this.parrot.view, this.markerThing.view, this.tap.view, this.petThing?.view]) v?.parent?.removeChild(v);
@@ -164,6 +187,14 @@ export class WorldEngine {
     this.pokeables = [];
     this.endRide(true);
     this.night = null;
+    this.aurora = null;
+    this.rainbowArc = null;
+    this.krakens = [];
+    this.seaTaps = [];
+    this.penguinTaps.clear();
+    this.atPot = false;
+    this.snow = null;
+    this.clouds = null;
     this.cinematic = null;
     this.timers = [];
     this.near = null;
@@ -177,9 +208,14 @@ export class WorldEngine {
     this.world.addChild(root);
     this.ground = buildGround(map);
     const sparkleLayer = new Container();
+    if (kind === 'sky') {
+      // Open sky: a gradient, and a sea of clouds the islands float over.
+      this.clouds = new CloudSea(map.bounds);
+      root.addChild(this.clouds.backdrop, this.clouds.below);
+    }
     root.addChild(this.ground.water, sparkleLayer, this.ground.foam, this.ground.land, this.ground.fog);
-    if (kind !== 'island') {
-      const walls = C.buildWalls(kind);
+    if (kind !== 'island' && !isIsle(kind)) {
+      const walls = C.buildWalls(kind as InteriorKind);
       root.addChild(walls.view);
       this.things.push(walls);
     }
@@ -189,8 +225,13 @@ export class WorldEngine {
     root.addChild(this.tap.view, this.entities, this.particles.layer);
     this.ambient = null;
     this.things.push(this.tap, this.markerThing);
+    if (this.clouds) root.addChild(this.clouds.above);
+    if (kind === 'frost') {
+      this.snow = new Snowfall(() => this.viewRect());
+      root.addChild(this.snow.layer);
+    }
 
-    if (kind === 'island') {
+    if (kind === 'island' || kind === 'lagoon' || kind === 'frost') {
       for (let i = 0; i < 70; i++) {
         const g = new Graphics();
         g.ellipse(0, 0, 9, 2.2).fill({ color: 0xffffff, alpha: 0.85 });
@@ -209,9 +250,9 @@ export class WorldEngine {
     for (const p of map.props) {
       const t = this.makeProp(p.kind, p.seed);
       if (!t) continue;
-      this.add(t, p.gx, p.gy, p.size ? p.size * TH * 0.35 : p.kind === 'chandelier' || p.kind === 'lantern' ? 1e5 : 0);
-      if (['ferris', 'lighthouse', 'volcano', 'temple'].includes(p.kind)) this.landmarks[p.kind] = { prop: p, thing: t };
-      if (['palm', 'balloons', 'boat'].includes(p.kind)) this.pokeables.push({ prop: p, thing: t });
+      this.add(t, p.gx, p.gy, p.size ? p.size * TH * 0.35 : p.kind === 'chandelier' || p.kind === 'lantern' ? 1e5 : p.kind === 'moon' ? -1e5 : 0);
+      if (['ferris', 'lighthouse', 'volcano', 'temple', 'mermaid', 'crystal', 'gong'].includes(p.kind)) this.landmarks[p.kind] = { prop: p, thing: t };
+      if (['palm', 'balloons', 'boat'].includes(p.kind) || POKE_BOX[p.kind]) this.pokeables.push({ prop: p, thing: t });
     }
     for (const s of map.spots) this.add(this.makeSpot(s), s.gx, s.gy);
     if (kind === 'island') {
@@ -244,10 +285,10 @@ export class WorldEngine {
       }
     }
 
-    // Where the player appears.
+    // Where the player appears: by the door back to where they came from (off the ferry: on the pier).
     let spawn = at ?? map.spawn;
     if (!at && fromKind) {
-      const door = map.spots.find((s) => s.kind === 'enter' && s.to === fromKind);
+      const door = map.spots.find((s) => (s.kind === 'enter' && s.to === fromKind) || (s.kind === 'ferry' && isIsle(fromKind)));
       if (door) spawn = { gx: door.ax, gy: door.ay };
     }
     Object.assign(this.player, { gx: spawn.gx, gy: spawn.gy, path: [], moving: false });
@@ -314,9 +355,10 @@ export class WorldEngine {
     this.focus = { x, y: y - 50, zoom: Math.min(1.7, this.defaultZoom() * 1.45) };
   }
 
-  /** Fast travel: the player appears at the zone's signpost (leaving a room first if inside); the VIP Salon is a room. */
+  /** Fast travel: the player appears at the zone's signpost (leaving a room first if inside); the VIP Salon is a room,
+   *  and the isles are maps of their own (you arrive at the ferry dock). */
   travel(zone: ZoneKey) {
-    if (zone === 'vip') return this.enterScene('vip');
+    if (zone === 'vip' || isIsle(zone)) return this.enterScene(zone);
     if (this.map.kind !== 'island') this.enterScene('island');
     const sign = this.map.spots.find((s) => s.kind === 'travel' && s.zone === zone);
     const [gx, gy] = sign ? [sign.ax, sign.ay] : this.map.centers[zone] ?? [this.map.spawn.gx, this.map.spawn.gy];
@@ -387,8 +429,115 @@ export class WorldEngine {
         this.later(0.4, () => sound.play('bell'));
         this.particles.fireflies(x, y - 40, 34, 9);
         return true;
+      case 'mermaid': {
+        // Her song: bubbles, and dolphins leaping all round the lagoon.
+        this.cooldown.set(kind, this.time + 12);
+        this.cinematic = { kind, until: this.time + 6 };
+        this.player.path = [];
+        this.focus = { x: x + 260, y: y + 140, zoom: Math.max(0.5, this.defaultZoom() * 0.7) };
+        this.cb.onCinematic('🧜‍♀️ The mermaid sings…');
+        sound.play('sing');
+        this.particles.bubbles(x, y - 60, 18);
+        const c = toScreen(24, 24);
+        for (let i = 0; i < 7; i++)
+          this.later(0.5 + i * 0.6, () => {
+            const a = Math.random() * Math.PI * 2;
+            const px = c.x + Math.cos(a) * 140, py = c.y + Math.sin(a) * 70;
+            this.particles.dolphin(px, py, Math.random() < 0.5 ? -1 : 1);
+            sound.play('splash');
+          });
+        return true;
+      }
+      case 'crystal':
+        this.cooldown.set(kind, this.time + 16);
+        sound.play('chime');
+        this.particles.burst(x, y - 130, 40, 0xc8f6ff);
+        this.startAurora();
+        return true;
+      case 'gong': {
+        // Thunder and lightning round the islands, then a rainbow over the kingdom.
+        this.cooldown.set(kind, this.time + 14);
+        this.cinematic = { kind, until: this.time + 5.5 };
+        this.player.path = [];
+        const c = toScreen(24, 24);
+        this.focus = { x: c.x, y: c.y - 120, zoom: Math.max(0.5, this.defaultZoom() * 0.62) };
+        this.cb.onCinematic('⚡ The sky answers!');
+        sound.play('bell');
+        for (let i = 0; i < 6; i++)
+          this.later(0.4 + i * 0.35, () => {
+            const bx = c.x + (Math.random() - 0.5) * 1100;
+            this.particles.bolt(bx, c.y - 700, c.y - 60 + Math.random() * 200);
+            this.shakeUntil = this.time + 0.3;
+            if (i % 2 === 0) sound.play('thunder');
+          });
+        this.later(2.8, () => this.startRainbow());
+        return true;
+      }
     }
     return false;
+  }
+
+  /** Frost Isle's crystal: the aurora — dusk falls and green and violet curtains ripple across the sky. */
+  private startAurora() {
+    const layer = new Container();
+    const overlay = new Graphics();
+    overlay.rect(-6000, -3000, 12000, 9000).fill(0x2a3a7e);
+    overlay.blendMode = 'multiply';
+    const bands = new Graphics();
+    bands.blendMode = 'add';
+    layer.addChild(overlay, bands);
+    layer.alpha = 0;
+    this.root!.addChild(layer);
+    this.aurora = { t0: this.time, layer, bands };
+  }
+
+  private updateAurora(t: number) {
+    const a = this.aurora!;
+    const k = t - a.t0;
+    a.layer.alpha = Math.max(0, Math.min(1, k / 1.5, (13 - k) / 1.5));
+    const v = this.viewRect();
+    const g = a.bands;
+    g.clear();
+    const colours = [0x5fffb0, 0x7fd6ff, 0xc08cff];
+    colours.forEach((col, j) => {
+      const top: number[] = [], bottom: number[] = [];
+      const y0 = v.y - v.h * (0.38 - j * 0.07);
+      for (let i = 0; i <= 24; i++) {
+        const x = v.x - v.w * 0.6 + (v.w * 1.2 * i) / 24;
+        const wave = Math.sin(i * 0.5 + t * (0.8 + j * 0.3) + j * 2) * 40 + Math.sin(i * 0.17 + t * 0.5) * 30;
+        top.push(x, y0 + wave);
+        bottom.unshift(x, y0 + wave + 90 + Math.sin(i * 0.9 + t * 1.6) * 30);
+      }
+      g.poly([...top, ...bottom]).fill({ color: col, alpha: 0.22 });
+    });
+    if (k >= 13) {
+      a.layer.destroy({ children: true });
+      this.aurora = null;
+    }
+  }
+
+  /** The Sky Kingdom's gong: a rainbow over the islands for a few seconds. */
+  private startRainbow() {
+    const g = new Graphics();
+    const c = toScreen(24, 24);
+    const colours = [0xff5b6e, 0xff9d3d, 0xffe066, 0x5fd38a, 0x4fc3ff, 0xb07cff];
+    colours.forEach((col, i) => g.arc(0, 0, 640 - i * 26, Math.PI, 0).stroke({ width: 26, color: col, alpha: 0.75 }));
+    g.position.set(c.x, c.y + 80);
+    g.alpha = 0;
+    g.zIndex = -1e5;
+    this.entities.addChild(g);
+    this.rainbowArc = { t0: this.time, g };
+    sound.play('level');
+  }
+
+  private updateRainbow(t: number) {
+    const r = this.rainbowArc!;
+    const k = t - r.t0;
+    r.g.alpha = Math.max(0, Math.min(1, k / 1.2, (8 - k) / 1.5)) * 0.85;
+    if (k >= 8) {
+      r.g.destroy();
+      this.rainbowArc = null;
+    }
   }
 
   private later(sec: number, fn: () => void) {
@@ -534,13 +683,102 @@ export class WorldEngine {
         sound.play('horn');
         return true;
       }
+      const box = POKE_BOX[prop.kind];
+      if (box && Math.abs(dx) < box[0] && dy > box[1] && dy < box[2]) {
+        const found = thing.poke?.(this.time);
+        this.poked(prop, typeof found === 'string' ? found : null, x, y);
+        return true;
+      }
     }
     return false;
   }
 
+  /** The little show after a tap on one of the isles' things, and the secret it may reveal. */
+  private poked(prop: Prop, found: string | null, x: number, y: number) {
+    const t = this.time;
+    switch (prop.kind) {
+      case 'shipwreck':
+        sound.play('ghost');
+        if (found) this.cb.onSecret(found);
+        break;
+      case 'clam':
+        sound.play(found ? 'chime' : 'pop');
+        if (found) {
+          for (let i = 0; i < 10; i++) this.particles.sparkle(x + (Math.random() - 0.5) * 60, y - 30 - Math.random() * 40, 0xfff0ff);
+          this.cb.onSecret(found);
+        }
+        break;
+      case 'penguin': {
+        if (!found) break;
+        sound.play('squeak');
+        this.penguinTaps.set(prop, t);
+        for (const [p, at] of this.penguinTaps) if (t - at > 12) this.penguinTaps.delete(p);
+        const all = this.map.props.filter((p) => p.kind === 'penguin');
+        if (this.penguinTaps.size >= all.length) {
+          // All three: a belly-slide parade, one after the other.
+          this.penguinTaps.clear();
+          const things = this.pokeables.filter((p) => p.prop.kind === 'penguin');
+          things.forEach((p, i) => this.later(1.7 + i * 0.35, () => { (p.thing as ReturnType<typeof I.penguin>).slide(this.time, 1); sound.play('squeak'); }));
+          this.later(1.7, () => this.cb.onSecret('penguins'));
+        }
+        break;
+      }
+      case 'yetipine':
+        if (found) {
+          sound.play('roar');
+          this.particles.burst(x + 20, y - 80, 24);
+          this.cb.onSecret(found);
+        } else sound.play('thud');
+        break;
+      case 'snowman':
+        sound.play('pop');
+        break;
+      case 'moon':
+        sound.play(found ? 'ufo' : 'ding');
+        if (found) this.cb.onSecret(found);
+        break;
+      case 'bottle':
+        sound.play('chime');
+        this.cb.onSecret('bottle');
+        break;
+    }
+  }
+
+  /** Five quick taps on the open sea around the island and the kraken waves hello (a secret). */
+  private seaTap(local: { x: number; y: number }) {
+    const t = this.time;
+    this.seaTaps = this.seaTaps.filter((s) => t - s < 4);
+    this.seaTaps.push(t);
+    if (this.seaTaps.length < 5 || this.krakens.length) return;
+    this.seaTaps = [];
+    const k = I.kraken();
+    k.start(t);
+    k.view.position.set(local.x, local.y);
+    k.view.zIndex = local.y;
+    this.entities.addChild(k.view);
+    this.krakens.push(k);
+    this.particles.splash(local.x, local.y);
+    this.shakeUntil = t + 0.8;
+    sound.play('rumble');
+    this.later(0.4, () => sound.play('roar'));
+    this.cb.onSecret('kraken');
+  }
+
+  /** The Konami code: Polly turns rainbow for a while and fireworks go up (a secret). */
+  private konami() {
+    this.rainbowParrot = this.time;
+    sound.play('level');
+    const p = this.parrot.view.position;
+    for (let i = 0; i < 5; i++) this.later(i * 0.3, () => { this.particles.firework(p.x + (Math.random() - 0.5) * 360, p.y - 80 - Math.random() * 160); sound.play('pop'); });
+    this.cb.onSecret('konami');
+  }
+
   /** Landmark art is big: these boxes (around the foot) count as tapping it. */
   private landmarkAt(local: { x: number; y: number }): Spot | null {
-    const box: Record<string, [number, number, number]> = { ferris: [140, -320, 40], lighthouse: [50, -250, 30], volcano: [270, -320, 70], temple: [170, -200, 60] };
+    const box: Record<string, [number, number, number]> = {
+      ferris: [140, -320, 40], lighthouse: [50, -250, 30], volcano: [270, -320, 70], temple: [170, -200, 60],
+      mermaid: [70, -160, 30], crystal: [70, -190, 30], gong: [70, -180, 20],
+    };
     for (const [kind, lm] of Object.entries(this.landmarks)) {
       const b = box[kind];
       if (!b || !lm) continue;
@@ -620,6 +858,26 @@ export class WorldEngine {
       case 'lantern': return R.lantern(seed);
       case 'perch': return R.parrotPerch();
       case 'chestdecor': return A.chest(false);
+      // The isles
+      case 'mermaid': return I.mermaid();
+      case 'coral': return I.coral(seed);
+      case 'umbrella': return I.umbrella(seed);
+      case 'shipwreck': return I.shipwreck();
+      case 'clam': return I.clam();
+      case 'crystal': return I.crystal();
+      case 'pine': return I.pine(seed);
+      case 'yetipine': return I.pine(seed, true);
+      case 'igloo': return I.igloo();
+      case 'snowman': return I.snowman(seed);
+      case 'penguin': return I.penguin(seed);
+      case 'snowrock': return I.snowRock(seed);
+      case 'iceberg': return I.iceberg(seed);
+      case 'gong': return I.gong();
+      case 'cloudtree': return I.cloudTree(seed);
+      case 'goldpillar': return I.goldPillar(seed);
+      case 'potofgold': return I.potOfGold();
+      case 'moon': return I.moon();
+      case 'bottle': return I.bottle();
       default: return null;
     }
   }
@@ -633,7 +891,15 @@ export class WorldEngine {
         if (s.game === 'island-reels') return R.reelsMachine(s.gx * 0.13 + s.gy * 0.07, this.map.kind === 'vip');
         if (s.game === 'dragon-tiger') return R.dragonTigerTable(this.map.kind === 'vip');
         if (s.game === 'pirate-dice') return R.diceTable(s.gx * 0.11);
+        if (s.game === 'diamond-wheel') return I.diamondWheelStand(DIAMOND_SEGMENTS, GEMS);
+        if (s.game === 'coral-drop') return I.coralDropStall();
+        if (s.game === 'seahorse-derby') return I.derbyTank();
+        if (s.game === 'ice-fishing') return I.fishingHut();
+        if (s.game === 'ice-vault') return I.iceVault();
+        if (s.game === 'star-keno') return I.observatory();
+        if (s.game === 'oracle-chests') return I.oracleTemple();
         return A.stall(s.game!, s.label);
+      case 'ferry': return I.ferry(this.map.kind === 'sky');
       case 'travel': return A.signpost();
       case 'daily': return A.chest(true);
       case 'chest': return A.chest(false);
@@ -722,6 +988,11 @@ export class WorldEngine {
         e.preventDefault();
         this.interactNear();
       }
+      this.keyTrail = [...this.keyTrail, k].slice(-KONAMI.length);
+      if (this.keyTrail.join() === KONAMI.join()) {
+        this.keyTrail = [];
+        this.konami();
+      }
     });
     on(window, 'keyup', (e) => this.keys.delete(e.key.toLowerCase()));
     on(window, 'blur', () => this.keys.clear());
@@ -772,6 +1043,7 @@ export class WorldEngine {
       return;
     }
     const c = this.cell(tx, ty);
+    if (this.map.kind === 'island' && c && !c.land && c.shore >= 2) this.seaTap(local);
     if (c?.land && c.zone && !this.open.has(c.zone)) return this.cb.onLocked(c.zone);
     const goal = c && this.walkable(c) ? [tx, ty] : nearestWalkable(this.map, this.walkable, tx, ty);
     if (!goal) return;
@@ -883,6 +1155,28 @@ export class WorldEngine {
     this.parrot.view.scale.x = -Math.sin(orbit) >= 0 ? 1 : -1;
     this.parrot.view.zIndex = ps.y + 2;
     this.parrot.flap.scale.y = Math.sin(t * 22);
+    // The Konami secret: a rainbow Polly trailing stars for 12 seconds.
+    const rk = t - this.rainbowParrot;
+    if (rk < 12) {
+      const hue = (t * 0.6) % 1;
+      this.parrot.view.tint = hsl(hue);
+      if (Math.random() < dt * 24) this.particles.sparkle(this.parrot.view.x + (Math.random() - 0.5) * 20, this.parrot.view.y + 10, hsl((hue + 0.5) % 1));
+    } else if (rk < 12.2) this.parrot.view.tint = 0xffffff;
+
+    // The Sky Kingdom's pot of gold at the rainbow's end (a secret when you get there).
+    if (this.map.kind === 'sky') {
+      const pot = this.map.props.find((p) => p.kind === 'potofgold');
+      if (pot) {
+        const d = Math.hypot(pot.gx - pl.gx, pot.gy - pl.gy);
+        if (d < 1.8 && !this.atPot) {
+          this.atPot = true;
+          const q = toScreen(pot.gx, pot.gy);
+          for (let i = 0; i < 16; i++) this.later(i * 0.05, () => this.particles.sparkle(q.x + (Math.random() - 0.5) * 80, q.y - 40 - Math.random() * 60, [0xff5b6e, 0xffe066, 0x5fd38a, 0x4fc3ff, 0xb07cff][i % 5]));
+          sound.play('chime');
+          this.cb.onSecret('rainbow');
+        } else if (d > 3) this.atPot = false;
+      }
+    }
 
     // Zone, nearby interactable, doorways.
     this.emitZone();
@@ -907,8 +1201,11 @@ export class WorldEngine {
     }
     if (near) {
       const m = toScreen(near.gx, near.gy);
-      const funTall: Record<string, number> = { 'fun-ferris': 330, 'fun-lighthouse': 280, 'fun-volcano': 340, 'fun-temple': 200 };
-      const tall = near.kind === 'fun' ? funTall[near.id] ?? 200 : { game: 160, travel: 100, chest: 80, daily: 80, enter: near.to === 'vip' ? 225 : 110, exit: this.map.kind === 'vip' ? 90 : 190, board: 160, wardrobe: 160, cashier: 160 }[near.kind];
+      const funTall: Record<string, number> = { 'fun-ferris': 330, 'fun-lighthouse': 280, 'fun-volcano': 340, 'fun-temple': 200, 'fun-mermaid': 190, 'fun-crystal': 230, 'fun-gong': 210 };
+      const gameTall: Record<string, number> = { 'diamond-wheel': 270, 'coral-drop': 200, 'ice-vault': 190, 'star-keno': 200, 'oracle-chests': 205, 'ice-fishing': 175 };
+      const tall = near.kind === 'fun' ? funTall[near.id] ?? 200
+        : near.kind === 'game' ? gameTall[near.game!] ?? 160
+        : { game: 160, travel: 100, chest: 80, daily: 80, enter: near.to === 'vip' ? 225 : 110, exit: this.map.kind === 'vip' ? 90 : 190, board: 160, wardrobe: 160, cashier: 160, ferry: this.map.kind === 'sky' ? 255 : 150 }[near.kind];
       this.markerThing.view.position.set(m.x, m.y - tall);
       this.markerThing.view.zIndex = 1e6;
     }
@@ -924,7 +1221,19 @@ export class WorldEngine {
 
     this.particles.update(dt, t);
     this.ambient?.update(dt, t);
+    this.snow?.update(dt, t);
+    this.clouds?.update(dt);
     if (this.night) this.updateNight(t);
+    if (this.aurora) this.updateAurora(t);
+    if (this.rainbowArc) this.updateRainbow(t);
+    for (let i = this.krakens.length - 1; i >= 0; i--) {
+      const k = this.krakens[i];
+      k.update?.(t);
+      if (k.done(t)) {
+        k.view.destroy({ children: true });
+        this.krakens.splice(i, 1);
+      }
+    }
 
     // Camera, kept inside the map's bounds.
     const target = this.focus ?? { x: ps.x, y: ps.y - 40, zoom: this.cam.target };
@@ -954,5 +1263,13 @@ export class WorldEngine {
   }
 }
 
-const LEVELS: Partial<Record<ZoneKey, number>> = { casino: 2, jungle: 3, volcano: 4, vip: 5 };
+const LEVELS: Partial<Record<ZoneKey, number>> = { casino: 2, jungle: 3, volcano: 4, vip: 5, lagoon: 6, frost: 7, sky: 8 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** A bright colour round the colour wheel (h in 0-1). */
+function hsl(h: number) {
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    return Math.round(255 * (0.6 - 0.4 * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+  };
+  return (f(0) << 16) | (f(8) << 8) | f(4);
+}

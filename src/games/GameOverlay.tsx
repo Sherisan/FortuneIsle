@@ -3,8 +3,15 @@ import type { GameKey } from '../api/types.ts';
 import { freePlaysIn, money, useGame } from '../store/game.ts';
 import { GAME_ICON } from '../ui/Panels.tsx';
 import { CoconutShy } from './CoconutShy.tsx';
+import { CoralDrop } from './CoralDrop.tsx';
 import { CupShuffle } from './CupShuffle.tsx';
+import { DiamondWheel } from './DiamondWheel.tsx';
 import { DragonTiger } from './DragonTiger.tsx';
+import { IceFishing } from './IceFishing.tsx';
+import { IceVault } from './IceVault.tsx';
+import { OracleChests } from './OracleChests.tsx';
+import { SeahorseDerby } from './SeahorseDerby.tsx';
+import { StarKeno } from './StarKeno.tsx';
 import { IslandReels } from './IslandReels.tsx';
 import { PirateDice } from './PirateDice.tsx';
 import { DuckPond } from './DuckPond.tsx';
@@ -29,6 +36,13 @@ const GAMES: Record<GameKey, () => ReactNode> = {
   'island-reels': () => <IslandReels />,
   'dragon-tiger': () => <DragonTiger />,
   'pirate-dice': () => <PirateDice />,
+  'diamond-wheel': () => <DiamondWheel />,
+  'coral-drop': () => <CoralDrop />,
+  'seahorse-derby': () => <SeahorseDerby />,
+  'ice-fishing': () => <IceFishing />,
+  'ice-vault': () => <IceVault />,
+  'star-keno': () => <StarKeno />,
+  'oracle-chests': () => <OracleChests />,
 };
 
 /** The spring-animated card a stall opens; the world stays loaded (and paused) behind it. */

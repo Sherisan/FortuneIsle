@@ -62,6 +62,59 @@ export const DICE_FACES = ['anchor', 'skull', 'parrot', 'ship', 'chest', 'compas
 export const DICE_COUNT = 3;
 export const DICE_PAYS = [0, 2, 3, 12.36];
 
+/** Diamond Wheel (VIP Salon): 24 segments, back a gem; it pays 0.96 × 24 / its segments. */
+export const GEMS = ['pearl', 'sapphire', 'ruby', 'emerald', 'diamond'];
+export const DIAMOND_SEGMENTS = [0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 4, 0, 1, 0, 2, 0, 1, 0, 3];
+export const GEM_PAYS = [1.92, 3.84, 7.68, 11.52, 23.04];
+
+/** Coral Drop (plinko): 8 rows of coral; the pocket is the number of right bounces. */
+export const CORAL_ROWS = 8;
+export const CORAL_MODES = ['calm', 'wild'] as const;
+export const CORAL_POCKETS = [
+  [5.38, 2, 1.2, 0.9, 0.5, 0.9, 1.2, 2, 5.38],
+  [29.08, 3.5, 1.5, 0.3, 0.2, 0.3, 1.5, 3.5, 29.08],
+];
+
+/** Seahorse Derby: racer i wins with weight i (of 100) and pays 96 / weight. */
+export const DERBY_RACERS = ['Bubbles', 'Coral', 'Marina', 'Finn', 'Sir Squiggles'];
+export const DERBY_ODDS: Tier[] = [t('bubbles', 2.4, 40), t('coral', 3.84, 25), t('marina', 4.8, 20), t('finn', 9.6, 10), t('squiggles', 19.2, 5)];
+
+/** Ice Fishing: a catch table per hole (low, medium, high volatility). */
+export const FISHING_HOLES = ['shallow', 'deep', 'abyss'];
+export const FISHING_TABLES: Tier[][] = [
+  [t('boot', 0, 286), t('sardine', 0.5, 250), t('perch', 1, 200), t('trout', 1.5, 150), t('salmon', 3, 80), t('tuna', 5, 34)],
+  [t('boot', 0, 601), t('cod', 1, 200), t('snapper', 2, 130), t('swordfish', 5, 50), t('shark', 10, 15), t('whale', 25, 4)],
+  [t('boot', 0, 1972), t('eel', 2, 350), t('angler', 5, 150), t('squid', 20, 25), t('kraken', 100, 2), t('narwhal', 250, 1)],
+];
+
+/** Ice Vault: pays by digits in the right place (0-3). */
+export const VAULT_DIGITS = 3;
+export const VAULT_PAYS = [0, 2, 12, 150];
+
+/** Star Keno: 16 stars, 4 shooting stars; KENO_PAYS[n − 1][k] pays k hits with n picks. */
+export const KENO_STARS = 16;
+export const KENO_DRAWS = 4;
+export const KENO_MAX_PICKS = 4;
+export const KENO_PAYS = [
+  [0, 3.84],
+  [0, 1.2, 9.6],
+  [0, 0.5, 4, 29.4],
+  [0, 0, 2.6, 12, 141.6],
+];
+
+/** Oracle's Chests: staying wins 1/3 at ×2.88, switching wins 2/3 at ×1.44. */
+export const ORACLE_CHESTS = 3;
+export const ORACLE_STAY = 2.88;
+export const ORACLE_SWITCH = 1.44;
+
+/** n choose k. */
+export const choose = (n: number, k: number) => {
+  if (k < 0 || k > n) return 0;
+  let r = 1;
+  for (let i = 0; i < k; i++) r = (r * (n - i)) / (i + 1);
+  return r;
+};
+
 export const TEMPLE_LEVELS = 8;
 export const TEMPLE_DOORS = 3;
 /** 0.96 × 1.5^level floored to 2 dp. */
@@ -117,7 +170,12 @@ export const ZONES: Zone[] = [
   { key: 'jungle', name: 'Jungle Ruins', level: 3 },
   { key: 'volcano', name: 'Volcano Summit', level: 4 },
   { key: 'vip', name: 'VIP Salon', level: 5 },
+  { key: 'lagoon', name: 'Coral Lagoon', level: 6 },
+  { key: 'frost', name: 'Frost Isle', level: 7 },
+  { key: 'sky', name: 'Sky Kingdom', level: 8 },
 ];
+/** The highest level a zone opens at (?unlock starts there). */
+export const TOP_LEVEL = Math.max(...ZONES.map((z) => z.level));
 
 const c = (id: string, kind: Cosmetic['kind'], name: string, level: number): Cosmetic => ({ id, kind, name, level });
 export const COSMETICS: Cosmetic[] = [
@@ -127,12 +185,14 @@ export const COSMETICS: Cosmetic[] = [
   c('hat-pirate', 'hat', 'Pirate hat', 4),
   c('hat-flower', 'hat', 'Hibiscus', 0),
   c('hat-crown', 'hat', 'Golden crown', 0),
+  c('hat-snorkel', 'hat', 'Snorkel mask', 6),
   c('outfit-tee', 'outfit', 'Island tee', 1),
   c('outfit-hawaiian', 'outfit', 'Hawaiian shirt', 2),
   c('outfit-sailor', 'outfit', 'Sailor suit', 3),
   c('outfit-tux', 'outfit', 'Casino tux', 5),
   c('outfit-explorer', 'outfit', 'Explorer kit', 0),
   c('outfit-gold', 'outfit', 'Gold suit', 0),
+  c('outfit-parka', 'outfit', 'Snow parka', 7),
   c('pet-none', 'pet', 'No pet', 1),
   c('pet-crab', 'pet', 'Crab', 3),
   c('pet-turtle', 'pet', 'Turtle', 5),
@@ -142,6 +202,7 @@ export const COSMETICS: Cosmetic[] = [
   c('fx-coins', 'effect', 'Coin shower', 2),
   c('fx-fireworks', 'effect', 'Fireworks', 5),
   c('fx-hearts', 'effect', 'Hearts', 0),
+  c('fx-stars', 'effect', 'Shooting stars', 8),
 ];
 
 export const GAMES: { key: GameKey; name: string; zone: ZoneKey; kind: GameMeta['kind'] }[] = [
@@ -157,6 +218,13 @@ export const GAMES: { key: GameKey; name: string; zone: ZoneKey; kind: GameMeta[
   { key: 'island-reels', name: 'Island Reels', zone: 'casino', kind: 'instant' },
   { key: 'dragon-tiger', name: 'Dragon Tiger', zone: 'casino', kind: 'instant' },
   { key: 'pirate-dice', name: 'Pirate Dice', zone: 'harbour', kind: 'instant' },
+  { key: 'diamond-wheel', name: 'Diamond Wheel', zone: 'vip', kind: 'instant' },
+  { key: 'coral-drop', name: 'Coral Drop', zone: 'lagoon', kind: 'instant' },
+  { key: 'seahorse-derby', name: 'Seahorse Derby', zone: 'lagoon', kind: 'instant' },
+  { key: 'ice-fishing', name: 'Ice Fishing', zone: 'frost', kind: 'instant' },
+  { key: 'ice-vault', name: 'Ice Vault', zone: 'frost', kind: 'instant' },
+  { key: 'star-keno', name: 'Star Keno', zone: 'sky', kind: 'instant' },
+  { key: 'oracle-chests', name: 'Oracle’s Chests', zone: 'sky', kind: 'steps' },
 ];
 
 /** The info a real API returns, built from these rules (demo engine). */
@@ -175,6 +243,13 @@ export function demoInfo(): Info {
       case 'island-reels': return { tiers: REELS_TABLE };
       case 'dragon-tiger': return { ranks: CARD_RANKS, pays: DT_PAYS, tie: DT_TIE };
       case 'pirate-dice': return { faces: DICE_FACES, dice: DICE_COUNT, pays: DICE_PAYS };
+      case 'diamond-wheel': return { gems: GEMS, segments: DIAMOND_SEGMENTS, pays: GEM_PAYS };
+      case 'coral-drop': return { rows: CORAL_ROWS, modes: [...CORAL_MODES], pockets: CORAL_POCKETS };
+      case 'seahorse-derby': return { racers: DERBY_RACERS, odds: DERBY_ODDS };
+      case 'ice-fishing': return { holes: FISHING_HOLES, tables: FISHING_TABLES };
+      case 'ice-vault': return { digits: VAULT_DIGITS, pays: VAULT_PAYS };
+      case 'star-keno': return { stars: KENO_STARS, draws: KENO_DRAWS, maxPicks: KENO_MAX_PICKS, pays: KENO_PAYS };
+      case 'oracle-chests': return { chests: ORACLE_CHESTS, stay: ORACLE_STAY, switch: ORACLE_SWITCH };
     }
   };
   return {

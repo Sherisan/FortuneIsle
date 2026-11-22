@@ -21,6 +21,9 @@ export function handleInteract(spot: Spot) {
     case 'exit':
       useGame.setState({ doorway: { kind: 'exit', to: spot.to ?? 'island' } });
       break;
+    case 'ferry':
+      useGame.setState({ doorway: { kind: 'ferry', to: g.scene } });
+      break;
     case 'fun': {
       const started = world.engine?.fun(spot.id);
       const lines: Record<string, string> = {
@@ -28,6 +31,9 @@ export function handleInteract(spot: Spot) {
         'fun-lighthouse': 'Lights on! The whole island glows at dusk. Squawk!',
         'fun-volcano': 'You poked the volcano?! Duck!',
         'fun-temple': 'The gem awakens… ooh, fireflies!',
+        'fun-mermaid': 'Shh… the mermaid’s singing. Look — dolphins!',
+        'fun-crystal': 'The crystal hums… the northern lights! Ooooh.',
+        'fun-gong': 'BWONNNG! Thunder! …and a rainbow. Worth it.',
       };
       g.say(started ? lines[spot.id] ?? 'Squawk!' : 'Give it a moment to recover, matey.');
       break;
@@ -93,6 +99,7 @@ export function WorldView() {
       },
       onScene: (scene) => useGame.getState().setScene(scene),
       onCinematic: (caption) => useGame.setState({ cinematic: caption }),
+      onSecret: (id) => useGame.getState().findSecret(id),
     }).then((e) => {
       if (!alive) return e.destroy();
       engine = e;

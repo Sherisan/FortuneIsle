@@ -7,6 +7,7 @@ import '@fontsource/fredoka/700.css';
 import '@fontsource/nunito/600.css';
 import '@fontsource/nunito/800.css';
 import './styles/global.css';
+import './styles/isles.css';
 import { useGame } from './store/game.ts';
 import { world } from './world/WorldView.tsx';
 

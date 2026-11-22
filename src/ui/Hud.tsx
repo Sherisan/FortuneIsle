@@ -1,14 +1,18 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { money, useGame } from '../store/game.ts';
 import { handleInteract, world } from '../world/WorldView.tsx';
 import { PollyFace } from './Polly.tsx';
+import { POLLY_JOKES } from './secrets.ts';
 
 const ZONE_NAMES: Record<string, string> = {
   harbour: 'The Harbour', boardwalk: 'The Boardwalk', fairground: 'The Fairground', casino: 'Grand Casino', jungle: 'Jungle Ruins', volcano: 'Volcano Summit',
-  vip: 'VIP Salon',
+  vip: 'VIP Salon', lagoon: '🐚 Coral Lagoon', frost: '❄️ Frost Isle', sky: '☁️ Sky Kingdom',
 };
 /** The banner shown on walking into a room. */
-const ROOM_NAMES: Record<string, string> = { casino: 'Inside the Grand Casino', vip: '💎 The VIP Salon', tavern: '⚓ The Rusty Anchor' };
+const ROOM_NAMES: Record<string, string> = {
+  casino: 'Inside the Grand Casino', vip: '💎 The VIP Salon', tavern: '⚓ The Rusty Anchor',
+  lagoon: '🐚 The Coral Lagoon', frost: '❄️ Frost Isle', sky: '☁️ The Sky Kingdom',
+};
 
 export function Hud() {
   return (
@@ -99,7 +103,7 @@ function Prompt() {
   const near = useNear();
   const blocked = useGame((s) => s.game != null || s.panel != null || s.doorway != null || s.cinematic != null);
   if (!near || blocked) return null;
-  const verb: Record<string, string> = { game: 'Play', travel: 'Fast travel', daily: 'Open', chest: 'Unlock', wardrobe: 'Open', board: 'Read', cashier: 'Visit', enter: 'Enter the', exit: '', fun: '' };
+  const verb: Record<string, string> = { game: 'Play', travel: 'Fast travel', daily: 'Open', chest: 'Unlock', wardrobe: 'Open', board: 'Read', cashier: 'Visit', enter: 'Enter the', exit: '', fun: '', ferry: 'Board the' };
   return (
     <button className="prompt" onClick={() => handleInteract(near)}>
       <span>{verb[near.kind]}</span> <b>{near.label}</b>
@@ -120,9 +124,22 @@ function Caption() {
 
 function PollyBubble() {
   const polly = useGame((s) => s.polly);
+  // Tap Polly five times and she tells a joke (a secret, the first time).
+  const taps = useRef<number[]>([]);
+  const tap = () => {
+    const now = Date.now();
+    taps.current = [...taps.current.filter((t) => now - t < 3000), now];
+    if (taps.current.length < 5) return;
+    taps.current = [];
+    const g = useGame.getState();
+    g.say(POLLY_JOKES[Math.floor(Math.random() * POLLY_JOKES.length)]);
+    g.findSecret('polly');
+  };
   return (
     <div className={`polly${polly ? ' talking' : ''}`}>
-      <PollyFace />
+      <button className="polly-btn" onClick={tap} aria-label="Polly the parrot">
+        <PollyFace />
+      </button>
       {polly && (
         <div className="bubble" key={polly.id}>
           {polly.text}

@@ -40,6 +40,11 @@ export function Celebration() {
     };
     if (kind === 'fireworks') {
       for (let k = 0; k < (c.big ? 6 : 3); k++) setTimeout(() => { burst(W * (0.2 + Math.random() * 0.6), H * (0.2 + Math.random() * 0.3), 50, 7); sound.play('pop'); }, k * 280);
+    } else if (kind === 'stars') {
+      // A shower of shooting stars streaking down from the top left.
+      for (let i = 0; i < Math.round(n * 0.5); i++)
+        parts.push({ x: Math.random() * W * 0.8 - W * 0.1, y: -40 - Math.random() * H * 0.4, vx: 5 + Math.random() * 4, vy: 3 + Math.random() * 3, r: 4 + Math.random() * 4, rot: 0, vr: 0.04, c: COLORS[i % COLORS.length], life: 1.4, kind });
+      sound.play('magic');
     } else burst(W / 2, H * 0.45, n, kind === 'coins' ? 9 : 11);
     let raf = 0;
     const tick = () => {
@@ -75,6 +80,23 @@ export function Celebration() {
           ctx.fillStyle = p.c;
           ctx.beginPath();
           ctx.arc(0, 0, p.r * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.kind === 'stars') {
+          // Shooting stars: a five-point star with a fading tail behind it.
+          const s = p.r * 1.3;
+          ctx.strokeStyle = 'rgba(255,243,176,0.5)';
+          ctx.lineWidth = s * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-p.vx * 3, -p.vy * 3);
+          ctx.stroke();
+          ctx.fillStyle = p.c === '#4fc3ff' || p.c === '#b07cff' ? '#ffffff' : '#ffe27a';
+          ctx.beginPath();
+          for (let k = 0; k < 10; k++) {
+            const a = (k / 10) * Math.PI * 2 - Math.PI / 2, rr = k % 2 ? s * 0.45 : s;
+            ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          }
+          ctx.closePath();
           ctx.fill();
         } else {
           ctx.fillStyle = p.c;

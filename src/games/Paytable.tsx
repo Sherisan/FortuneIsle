@@ -1,5 +1,8 @@
+import { choose } from '../api/rules.ts';
 import type { GameKey, Tier } from '../api/types.ts';
 import { useGame } from '../store/game.ts';
+import { GEM_ICON, GEM_NAME } from './DiamondWheel.tsx';
+import { FISH } from './IceFishing.tsx';
 import { DICE_ICON } from './PirateDice.tsx';
 import { REEL_ICON } from './IslandReels.tsx';
 import { SCRATCH_ICON } from './ScratchKiosk.tsx';
@@ -185,6 +188,132 @@ export function Paytable({ game }: { game: GameKey }) {
               ))}
             </tbody>
           </table>
+          {common}
+        </div>
+      );
+    }
+    case 'diamond-wheel': {
+      const pt = meta.paytable as { gems: string[]; segments: number[]; pays: number[] };
+      const n = pt.segments.length;
+      return (
+        <div className="paytable">
+          <p>A {n}-segment wheel of gems. Back one gem, then spin: if the pointer stops on your gem you win its price. Every segment is equally likely, so the fewer segments a gem has, the more it pays.</p>
+          <table className="pay">
+            <thead><tr><th>Gem</th><th>Segments</th><th>Pays</th><th>Chance</th></tr></thead>
+            <tbody>
+              {pt.gems.map((g, i) => {
+                const c = pt.segments.filter((x) => x === i).length;
+                return <tr key={g}><td>{GEM_ICON[g]} {GEM_NAME[g]}</td><td>{c}</td><td>×{pt.pays[i]}</td><td>{pct(c, n)}</td></tr>;
+              }).reverse()}
+            </tbody>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'coral-drop': {
+      const pt = meta.paytable as { rows: number; modes: string[]; pockets: number[][] };
+      const ways = 2 ** pt.rows;
+      return (
+        <div className="paytable">
+          <p>A pearl drops through {pt.rows} rows of coral and bounces left or right off each, at random. Where it lands — the pocket counted by its bounces to the right — sets your prize. The middle is most likely; the edges are rare.</p>
+          <table className="pay">
+            <thead><tr><th>Pocket</th><th>Calm</th><th>Wild</th><th>Chance</th></tr></thead>
+            <tbody>
+              {pt.pockets[0].slice(0, Math.ceil((pt.rows + 1) / 2)).map((_, k) => (
+                <tr key={k}>
+                  <td>{k === pt.rows - k ? 'Middle' : k === 0 ? 'The two edges' : `${k} in from the edges`}</td>
+                  <td>×{pt.pockets[0][k]}</td>
+                  <td>×{pt.pockets[1][k]}</td>
+                  <td>{pct(choose(pt.rows, k) * (k === pt.rows - k ? 1 : 2), ways)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'seahorse-derby': {
+      const pt = meta.paytable as { racers: string[]; odds: Tier[] };
+      const sum = total(pt.odds);
+      return (
+        <div className="paytable">
+          <p>Five seahorses race. Back one: if it wins, you’re paid its odds. The winner is drawn by the server with exactly these chances — the race is the reveal — and every seahorse returns the same over time.</p>
+          <table className="pay">
+            <thead><tr><th>Seahorse</th><th>Pays</th><th>Wins</th></tr></thead>
+            <tbody>
+              {pt.racers.map((r, i) => <tr key={r}><td>{r}</td><td>×{pt.odds[i].multiplier}</td><td>{pct(pt.odds[i].weight, sum)}</td></tr>)}
+            </tbody>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'ice-fishing': {
+      const pt = meta.paytable as { holes: string[]; tables: Tier[][] };
+      const names: Record<string, string> = { shallow: 'Shallow hole', deep: 'Deep hole', abyss: 'The Abyss' };
+      return (
+        <div className="paytable">
+          <p>Pick a hole in the ice and cast. Your catch is drawn from that hole’s table: shallow holes bite often with small fish, the abyss rarely bites — but holds the golden narwhal.</p>
+          {pt.holes.map((h, i) => (
+            <div key={h}>
+              <h4 className="pay-sub">{names[h] ?? h}</h4>
+              <TierTable tiers={pt.tables[i]} name={(t) => `${FISH[t.key]?.icon ?? '🐟'} ${FISH[t.key]?.name ?? t.key}`} />
+            </div>
+          ))}
+          {common}
+        </div>
+      );
+    }
+    case 'ice-vault': {
+      const pt = meta.paytable as { digits: number; pays: number[] };
+      const n = pt.digits;
+      const chance = (k: number) => (choose(n, k) * 9 ** (n - k)) / 10 ** n;
+      return (
+        <div className="paytable">
+          <p>Dial a {n}-digit code. The vault’s code is {n} fair digits; each digit of yours in the right place counts.</p>
+          <table className="pay">
+            <thead><tr><th>Right digits</th><th>Pays</th><th>Chance</th></tr></thead>
+            <tbody>
+              {[3, 2, 1, 0].map((k) => <tr key={k}><td>{k === 0 ? 'None' : `${k} of ${n}`}</td><td>{pt.pays[k] > 0 ? `×${pt.pays[k]}` : '—'}</td><td>{(chance(k) * 100).toFixed(k === 3 ? 1 : 1)}%</td></tr>)}
+            </tbody>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'star-keno': {
+      const pt = meta.paytable as { stars: number; draws: number; maxPicks: number; pays: number[][] };
+      const all = choose(pt.stars, pt.draws);
+      return (
+        <div className="paytable">
+          <p>Pick 1 to {pt.maxPicks} of the {pt.stars} stars. {pt.draws} shooting stars fall, each on a different star; you’re paid by how many of yours they hit.</p>
+          <table className="pay">
+            <thead><tr><th>Picked</th><th>Hits</th><th>Pays</th><th>Chance</th></tr></thead>
+            <tbody>
+              {pt.pays.flatMap((row, n0) => row.map((m, k) => ({ n: n0 + 1, k, m }))).filter((x) => x.m > 0).map((x) => (
+                <tr key={`${x.n}-${x.k}`}><td>{x.n}</td><td>{x.k}</td><td>×{x.m}</td><td>{pct(choose(x.n, x.k) * choose(pt.stars - x.n, pt.draws - x.k), all)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          {common}
+        </div>
+      );
+    }
+    case 'oracle-chests': {
+      const pt = meta.paytable as { chests: number; stay: number; switch: number };
+      return (
+        <div className="paytable">
+          <p>One of {pt.chests} chests holds the treasure. Pick one; the Oracle, who knows where it is, opens an empty chest from the other two. Then stay with yours, or switch to the last closed chest.</p>
+          <table className="pay">
+            <thead><tr><th>You…</th><th>Pays</th><th>Chance</th></tr></thead>
+            <tbody>
+              <tr><td>Stay</td><td>×{pt.stay}</td><td>33.3%</td></tr>
+              <tr><td>Switch</td><td>×{pt.switch}</td><td>66.7%</td></tr>
+            </tbody>
+          </table>
+          <p className="small">Switching wins twice as often because the Oracle never opens your chest or the treasure. Both choices return the same over time.</p>
           {common}
         </div>
       );

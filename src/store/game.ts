@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { createDemoApi } from '../api/demo.ts';
 import { createHttpApi } from '../api/http.ts';
 import { ApiError, type BetBody, type FreePlay, type GameKey, type GameMeta, type Info, type IslandApi, type PromoOutcome, type PromoState, type State, type ZoneKey } from '../api/types.ts';
+import { BOTTLE_NOTE, loadSecrets, saveSecrets, SECRETS } from '../ui/secrets.ts';
 import { sound } from '../ui/sound.ts';
-import type { SceneKey } from '../world/map.ts';
+import { isIsle, type SceneKey } from '../world/map.ts';
 
 const demo = import.meta.env.VITE_DEMO === '1' || new URLSearchParams(location.search).has('demo');
 
-export type Panel = null | 'menu' | 'wardrobe' | 'history' | 'rg' | 'fair' | 'board' | 'travel' | 'paytables' | 'promos';
+export type Panel = null | 'menu' | 'wardrobe' | 'history' | 'rg' | 'fair' | 'board' | 'travel' | 'paytables' | 'promos' | 'secrets';
 
 export interface Toast {
   id: number;
@@ -43,8 +44,12 @@ interface Store {
   seenZones: ZoneKey[];
   /** Which map the player is on. */
   scene: SceneKey;
-  /** A doorway in progress: a building's entrance overlay going in (to = the room), or the quick fade going out. */
-  doorway: null | { kind: 'enter' | 'exit'; to: SceneKey };
+  /** A doorway in progress: a building's entrance overlay going in (to = the room), the quick fade going out, or the
+   *  ferry's sailing chart (to = where the player is now). */
+  doorway: null | { kind: 'enter' | 'exit' | 'ferry'; to: SceneKey };
+  /** Secrets found on this device (easter eggs). */
+  secrets: string[];
+  findSecret(id: string): void;
   /** Caption while a landmark show plays (the Ferris wheel ride, the eruption). */
   cinematic: string | null;
   setScene(s: SceneKey): void;
@@ -127,6 +132,29 @@ export const useGame = create<Store>((set, get) => ({
   cinematic: null,
   promos: null,
   useFree: false,
+  secrets: loadSecrets(),
+
+  findSecret(id) {
+    const s = SECRETS.find((x) => x.id === id);
+    if (!s) return;
+    if (id === 'bottle') get().say(BOTTLE_NOTE);
+    if (get().secrets.includes(id)) {
+      if (s.line) get().say(s.line);
+      return;
+    }
+    const secrets = [...get().secrets, id];
+    saveSecrets(secrets);
+    set({ secrets });
+    sound.play('secret');
+    get().toast(`🗝️ Secret found: ${s.name} (${secrets.length}/${SECRETS.length})`, 'level');
+    if (s.line) get().say(s.line);
+    if (secrets.length === SECRETS.length)
+      setTimeout(() => {
+        get().toast('🏆 Every secret on the isles found!', 'level');
+        get().say('Every single secret! You’re a true island explorer, matey. Squawk!');
+        sound.play('bigwin');
+      }, 3000);
+  },
 
   async loadPromos(skipRound) {
     let p: PromoState;
@@ -169,8 +197,11 @@ export const useGame = create<Store>((set, get) => ({
     sound.ambience(true, s);
     const lines: Partial<Record<SceneKey, string>> = {
       casino: 'Ooh, fancy! Roulette on the left, Island Reels under the big screen, Dragon Tiger at the card tables — and the VIP Salon is up the stairs past the ropes.',
-      vip: 'The VIP Salon! Golden reels, a private roulette table and Dragon Tiger. Same fair odds as downstairs — just shinier.',
+      vip: 'The VIP Salon! Back a gem on the Diamond Wheel — or try the golden reels, private roulette and Dragon Tiger.',
       tavern: 'Arr, the Rusty Anchor! Pick a face at the Pirate Dice tables — three of yours pays ×12.36!',
+      lagoon: 'The Coral Lagoon! Drop a pearl at Coral Drop, or back a seahorse in the Derby. Psst — that shipwreck looks spooky…',
+      frost: 'Brrr, Frost Isle! Ice Fishing on the frozen lake, the Ice Vault in the rocks. Touch the crystal for the northern lights!',
+      sky: 'The Sky Kingdom! Star Keno in the observatory, the Oracle’s Chests in her temple — and mind the rainbows, they’re bridges.',
     };
     if (first && lines[s]) get().say(lines[s]);
   },
@@ -296,7 +327,8 @@ export const useGame = create<Store>((set, get) => ({
       get().toast(`Level ${s.player.level}! +${r.levelUp} key${r.levelUp > 1 ? 's' : ''}`, 'level');
       sound.play('level');
       const unlocked = get().info?.zones.find((z) => z.level === s.player.level);
-      if (unlocked) get().say(`Level ${s.player.level}! The ${unlocked.name} is open — use a signpost to fast-travel there!`);
+      if (unlocked && isIsle(unlocked.key)) get().say(`Level ${s.player.level}! The ${unlocked.name} is open — take the Island Hopper from the end of the Harbour pier!`);
+      else if (unlocked) get().say(`Level ${s.player.level}! The ${unlocked.name} is open — use a signpost to fast-travel there!`);
     }
   },
 
@@ -337,7 +369,8 @@ export const useGame = create<Store>((set, get) => ({
       casino: 'The Grand Casino! Walk up the red carpet to the doors to go inside.',
       jungle: 'The Jungle Ruins… mind the traps behind the Temple Doors! There’s a treasure chest hidden somewhere too.',
       volcano: 'Volcano Summit! The lava climbs and climbs — cash out before it erupts!',
-      vip: '', // the room's own greeting (setScene) covers it
+      // Rooms and isles: their own greeting (setScene) covers them.
+      vip: '', lagoon: '', frost: '', sky: '',
     };
     if (lines[z]) get().say(lines[z]);
   },

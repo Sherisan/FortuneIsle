@@ -18,10 +18,13 @@ export const TH = 48;
 export type Ground =
   | 'deep' | 'water' | 'shallow' | 'sand' | 'grass' | 'meadow' | 'planks' | 'plaza' | 'cobble' | 'jungle' | 'ruin' | 'rock' | 'basalt'
   // Indoors: 'void' is outside the room (not drawn); carpet, marble and the gold stage are floors.
-  | 'void' | 'carpet' | 'marble' | 'stage';
+  | 'void' | 'carpet' | 'marble' | 'stage'
+  // The isles: the lagoon's coral sand; Frost Isle's snow, ice and polar sea (icy by the shore); the Sky Kingdom's
+  // grass, gold tiles and rainbow bridges (its 'void' is open sky).
+  | 'coral' | 'snow' | 'ice' | 'icy' | 'polar' | 'skygrass' | 'gold' | 'rainbow';
 
-/** Water tiles (the island's sea); 'void' is not water. */
-export const isWaterGround = (g: Ground) => g === 'deep' || g === 'water' || g === 'shallow';
+/** Water tiles (the sea round an island); 'void' is not water. */
+export const isWaterGround = (g: Ground) => g === 'deep' || g === 'water' || g === 'shallow' || g === 'icy' || g === 'polar';
 
 export interface Cell {
   gx: number;
@@ -36,8 +39,9 @@ export interface Cell {
   r: number;
 }
 
-/** enter / exit are doorways between maps: walking up to one triggers it. */
-export type SpotKind = 'game' | 'travel' | 'daily' | 'wardrobe' | 'board' | 'cashier' | 'chest' | 'enter' | 'exit' | 'fun';
+/** enter / exit are doorways between maps: walking up to one triggers it. ferry: the Island Hopper's moorings (the
+ *  Harbour pier and each isle's dock) — using one opens the sailing chart. */
+export type SpotKind = 'game' | 'travel' | 'daily' | 'wardrobe' | 'board' | 'cashier' | 'chest' | 'enter' | 'exit' | 'fun' | 'ferry';
 
 /** Landmarks you can play with (no money involved): the spot sits on the landmark, the player stands at (ax, ay). */
 export const FUN_LABELS: Record<string, string> = {
@@ -45,10 +49,17 @@ export const FUN_LABELS: Record<string, string> = {
   lighthouse: 'Light the lighthouse',
   volcano: 'Poke the volcano',
   temple: 'Touch the temple gem',
+  mermaid: 'Hear the mermaid sing',
+  crystal: 'Touch the ice crystal',
+  gong: 'Ring the sky gong',
 };
 
-/** The island, and the interiors you walk into: the Grand Casino, its VIP Salon upstairs, and the Rusty Anchor tavern. */
-export type SceneKey = 'island' | 'casino' | 'vip' | 'tavern';
+/** The island, the interiors you walk into (the Grand Casino, its VIP Salon upstairs, the Rusty Anchor tavern) and the
+ *  isles the ferry sails to (Coral Lagoon, Frost Isle, Sky Kingdom — each is also the zone of the same name). */
+export type SceneKey = 'island' | 'casino' | 'vip' | 'tavern' | 'lagoon' | 'frost' | 'sky';
+export type IsleKind = Extract<SceneKey, 'lagoon' | 'frost' | 'sky'>;
+export const ISLES: IsleKind[] = ['lagoon', 'frost', 'sky'];
+export const isIsle = (s: string | null | undefined): s is IsleKind => s === 'lagoon' || s === 'frost' || s === 'sky';
 
 export interface Spot {
   id: string;
@@ -175,12 +186,14 @@ const SPOT_DEFS: Record<IslandZone, { id: string; kind: SpotKind; game?: GameKey
 
 const PATH_GROUND: Record<ZoneKey, Ground> = {
   harbour: 'planks', boardwalk: 'planks', fairground: 'cobble', casino: 'plaza', jungle: 'ruin', volcano: 'basalt', vip: 'marble',
+  lagoon: 'planks', frost: 'ice', sky: 'gold',
 };
 const LAND_GROUND: Record<ZoneKey, Ground> = {
   harbour: 'grass', boardwalk: 'sand', fairground: 'meadow', casino: 'grass', jungle: 'jungle', volcano: 'rock', vip: 'marble',
+  lagoon: 'sand', frost: 'snow', sky: 'skygrass',
 };
 
-function mulberry(seed: number) {
+export function mulberry(seed: number) {
   return () => {
     seed |= 0;
     seed = (seed + 0x6d2b79f5) | 0;
@@ -407,6 +420,34 @@ export function buildMap(): WorldMap {
     c.path = false;
     taken.add(idx(tx, ty + 1));
     spots.push({ id: 'chest', kind: 'chest', zone: 'jungle', gx: tx, gy: ty + 1, label: 'Treasure Chest', ax: tx, ay: ty });
+  }
+
+  // The Island Hopper ferry, moored past the end of the pier: it sails to the isles (each opens at its level). Open from
+  // level 1, so new players can read where it goes.
+  {
+    const ex = 34 + 11, ey = 34 + 11; // the pier's last tile (k = 11 above)
+    const fx = ex + 1, fy = ey + 1;
+    const c = at(fx, fy);
+    if (c) c.blocked = true;
+    taken.add(idx(fx, fy));
+    spots.push({ id: 'ferry', kind: 'ferry', zone: 'harbour', gx: fx, gy: fy, label: 'Island Hopper', ax: ex, ay: ey });
+  }
+
+  // A message in a bottle on a quiet beach (a secret: tap it).
+  {
+    let best: Cell | null = null;
+    let bd = Infinity;
+    for (const c of cells) {
+      if (!c.land || c.ground !== 'sand' || c.path || c.blocked || taken.has(idx(c.gx, c.gy))) continue;
+      if (c.zone !== 'boardwalk' && c.zone !== 'harbour') continue;
+      const d = Math.hypot(c.gx - 45, c.gy - 27);
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (best) {
+      props.push({ kind: 'bottle', gx: best.gx, gy: best.gy, zone: best.zone, seed: rnd() });
+      best.blocked = true;
+      taken.add(idx(best.gx, best.gy));
+    }
   }
 
   // Water depth for shading: steps to the nearest land.

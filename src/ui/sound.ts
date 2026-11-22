@@ -2,14 +2,16 @@
 
 type Sfx =
   | 'tick' | 'chip' | 'open' | 'close' | 'error' | 'win' | 'smallwin' | 'bigwin' | 'lose' | 'level' | 'squawk'
-  | 'whoosh' | 'thud' | 'horn' | 'pop' | 'spin' | 'ding' | 'bell' | 'scratch' | 'door' | 'trap' | 'rumble' | 'erupt' | 'step' | 'coin';
+  | 'whoosh' | 'thud' | 'horn' | 'pop' | 'spin' | 'ding' | 'bell' | 'scratch' | 'door' | 'trap' | 'rumble' | 'erupt' | 'step' | 'coin'
+  // The isles: water, ice and sky; the secrets.
+  | 'splash' | 'chime' | 'thunder' | 'roar' | 'sing' | 'ghost' | 'squeak' | 'ufo' | 'secret' | 'reel' | 'click' | 'magic';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = false;
 let ambienceNodes: { stop(): void } | null = null;
 let ambienceWanted = false;
-type Ambience = 'island' | 'casino' | 'vip' | 'tavern';
+type Ambience = 'island' | 'casino' | 'vip' | 'tavern' | 'lagoon' | 'frost' | 'sky';
 let ambienceKind: Ambience = 'island';
 
 function ac(): AudioContext | null {
@@ -170,6 +172,7 @@ export const sound = {
       };
       return;
     }
+    // Surf (the island, the lagoon), wind (Frost Isle) or a soft breeze (the Sky Kingdom): looped noise with a slow swell.
     const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
     const d = buf.getChannelData(0);
     let last = 0;
@@ -181,24 +184,37 @@ export const sound = {
     src.buffer = buf;
     src.loop = true;
     const f = c.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = 500;
+    f.type = kind === 'frost' ? 'bandpass' : 'lowpass';
+    f.frequency.value = kind === 'frost' ? 650 : kind === 'sky' ? 900 : 500;
+    if (kind === 'frost') f.Q.value = 0.9;
     const g = c.createGain();
-    g.gain.value = 0.08;
+    g.gain.value = kind === 'sky' ? 0.035 : kind === 'frost' ? 0.11 : 0.08;
     const lfo = c.createOscillator();
     const lg = c.createGain();
-    lfo.frequency.value = 0.12;
-    lg.gain.value = 0.05;
+    lfo.frequency.value = kind === 'frost' ? 0.2 : 0.12;
+    lg.gain.value = kind === 'sky' ? 0.02 : 0.05;
     lfo.connect(lg).connect(g.gain);
     src.connect(f).connect(g).connect(master);
     src.start();
     lfo.start();
+    // Now and then: gulls (island), a steel drum (lagoon), ice chimes (frost), a harp (sky).
+    const notes = { lagoon: [523, 659, 784, 880], frost: [1568, 1760, 2093, 2349], sky: [392, 494, 587, 740, 880] } as Record<string, number[]>;
     const gull = window.setInterval(() => {
-      if (Math.random() < 0.35) {
-        tone(1500, 0.25, { type: 'sine', vol: 0.03, slide: 0.7 });
-        tone(1400, 0.3, { type: 'sine', vol: 0.025, slide: 0.65, at: 0.3 });
+      const r = Math.random();
+      const scale = notes[kind];
+      if (!scale) {
+        if (r < 0.35) {
+          tone(1500, 0.25, { type: 'sine', vol: 0.03, slide: 0.7 });
+          tone(1400, 0.3, { type: 'sine', vol: 0.025, slide: 0.65, at: 0.3 });
+        }
+        return;
       }
-    }, 9000);
+      if (r > 0.55) return;
+      const n = kind === 'sky' ? 5 : 2;
+      const start = Math.floor(Math.random() * scale.length);
+      for (let i = 0; i < n; i++)
+        tone(scale[(start + i) % scale.length], kind === 'frost' ? 1.4 : 0.9, { type: kind === 'lagoon' ? 'triangle' : 'sine', vol: kind === 'frost' ? 0.012 : 0.022, at: i * (kind === 'sky' ? 0.14 : 0.22) });
+    }, kind === 'island' ? 9000 : 3200);
     ambienceNodes = {
       stop() {
         try {
@@ -240,6 +256,18 @@ export const sound = {
       case 'horn': tone(147, 0.9, { type: 'sawtooth', vol: 0.09, attack: 0.08 }); return tone(220, 0.9, { type: 'sawtooth', vol: 0.06, attack: 0.08 });
       case 'step': return noise(0.04, { vol: 0.03, freq: 800 });
       case 'coin': return tone(1975, 0.12, { type: 'square', vol: 0.05 });
+      case 'splash': noise(0.4, { vol: 0.14, freq: 1400, q: 0.6 }); return tone(320, 0.18, { type: 'sine', vol: 0.06, slide: 0.5 });
+      case 'chime': return arp([1568, 2093, 2637], 0.07, 'sine', 0.08);
+      case 'thunder': noise(1.4, { vol: 0.32, freq: 70, type: 'lowpass' }); return noise(0.25, { vol: 0.18, freq: 2500, type: 'highpass' });
+      case 'roar': tone(110, 0.9, { type: 'sawtooth', vol: 0.12, slide: 0.7, attack: 0.05 }); return noise(0.8, { vol: 0.12, freq: 260, q: 0.8 });
+      case 'sing': return [784, 988, 1175, 988, 1319, 1175, 988].forEach((n, i) => tone(n, 0.5, { type: 'sine', vol: 0.06, at: i * 0.32, attack: 0.08 }));
+      case 'ghost': tone(420, 1.4, { type: 'sine', vol: 0.06, slide: 0.6, attack: 0.3 }); return tone(440, 1.4, { type: 'sine', vol: 0.05, slide: 0.62, attack: 0.3, at: 0.05 });
+      case 'squeak': return tone(1400, 0.1, { type: 'square', vol: 0.04, slide: 1.6 });
+      case 'ufo': return [0, 0.25, 0.5].forEach((at) => tone(900, 0.25, { type: 'sine', vol: 0.06, slide: 1.8, at }));
+      case 'secret': return arp([659, 831, 988, 1319, 1661], 0.07, 'triangle', 0.12);
+      case 'reel': return noise(0.03, { vol: 0.05, freq: 2400, q: 4 });
+      case 'click': return tone(1200, 0.03, { type: 'square', vol: 0.05 });
+      case 'magic': return arp([880, 1109, 1319, 1760], 0.06, 'sine', 0.09);
     }
   },
 };

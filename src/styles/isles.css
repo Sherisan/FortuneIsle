@@ -1,0 +1,216 @@
+/* FORTUNE ISLE — the isles (levels 6-8), the VIP Salon's Diamond Wheel, the ferry and the secrets. Same candy style. */
+
+.g-diamond-wheel { --accent: #c0479c; } .g-coral-drop { --accent: #ff6f86; } .g-seahorse-derby { --accent: #14b8c4; }
+.g-ice-fishing { --accent: #2ea7e8; } .g-ice-vault { --accent: #5a6fd6; } .g-star-keno { --accent: #4a3fa0; } .g-oracle-chests { --accent: #8f62d6; }
+.zone-banner.z-lagoon { background: linear-gradient(#7fe9f0, #14b8c4); }
+.zone-banner.z-frost { background: linear-gradient(#e8f4ff, #9fd8ee); color: var(--plum); }
+.zone-banner.z-sky { background: linear-gradient(#c8b6ff, #8fd3ff); }
+.z-vip { background: #fbe8f6; } .z-lagoon { background: #dffbfb; } .z-frost { background: #eef7ff; } .z-sky { background: #f0ecff; }
+.pay-sub { font: 700 15px var(--font); margin: 12px 0 0; }
+.vault-row { flex-wrap: nowrap; }
+.vault-row .btn { flex: none; }
+.vault-row .vault-go { flex: 1; }
+
+/* Polly answers taps (five for a joke). */
+.polly-btn { pointer-events: auto; border: 0; background: none; padding: 0; line-height: 0; cursor: pointer; }
+.polly-btn:active .polly-face { transform: scale(.92) rotate(-6deg); }
+
+/* ── Diamond Wheel ─────────────────────────────────────────────── */
+.dw { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.dw-gems { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; }
+.dw-gem { border: 3px solid var(--plum); border-radius: 14px; background: #fff; padding: 6px 2px; display: flex; flex-direction: column; align-items: center; gap: 1px; box-shadow: 0 3px 0 var(--plum); }
+.dw-gem span { font-size: 22px; line-height: 1.1; }
+.dw-gem b { font: 700 14px var(--font); }
+.dw-gem small { font-size: 10px; font-weight: 800; color: var(--muted); }
+.dw-gem.on { background: linear-gradient(#fff3b0, var(--gold)); transform: translateY(-3px); box-shadow: 0 6px 0 var(--plum); }
+.dw-gem.landed { outline: 3px dashed #c0479c; outline-offset: 2px; }
+.dw-wheel { width: min(290px, 100%); }
+.wheel .mine path { stroke: #ffd23f; stroke-width: 4; }
+
+/* ── Coral Drop ────────────────────────────────────────────────── */
+.cd-board { position: relative; width: min(400px, 100%); aspect-ratio: 1 / .92; margin: 0 auto; border: 4px solid var(--plum); border-radius: 22px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0, #bff6ff, #4fd0e0 55%, #1d8f9e); box-shadow: inset 0 0 0 4px rgba(255,255,255,.35), 0 5px 0 var(--plum); }
+.cd-board.wild { background: radial-gradient(ellipse at 50% 0, #d9c8ff, #6f7fe0 55%, #2c3f9e); }
+.cd-peg { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffd0d8, #ff6f86 60%, #c43a5a);
+  border: 2px solid var(--plum); transition: transform .2s; }
+.cd-peg.hit { transform: scale(1.45); box-shadow: 0 0 0 4px rgba(255,255,255,.6); }
+.cd-pearl { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; z-index: 3;
+  background: radial-gradient(circle at 35% 30%, #fff, #f7e8f5 55%, #cdb6d8); border: 3px solid var(--plum); transition: left .22s cubic-bezier(.3,.2,.4,1), top .22s cubic-bezier(.5,0,.8,.6); }
+.cd-pockets { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: space-around; padding: 0 2px; }
+.cd-pocket { width: calc(100% / 9 - 4px); text-align: center; font: 700 12px var(--font); color: #fff; background: rgba(44,29,63,.55); border: 2px solid var(--plum);
+  border-radius: 9px 9px 12px 12px; padding: 5px 0; text-shadow: 0 1px 0 var(--plum); }
+.cd-pocket.good { background: #2fc36f; } .cd-pocket.top { background: linear-gradient(#ffe066, var(--gold-2)); color: var(--plum); text-shadow: none; } .cd-pocket.low { background: #6b5a8f; }
+.cd-pocket.lit { animation: pocket .7s cubic-bezier(.3,1.6,.5,1) both; box-shadow: 0 0 0 3px #fff, 0 0 18px #fff; }
+@keyframes pocket { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(4px) scale(1.25); } 100% { transform: scale(1.12); } }
+.cd-weed { position: absolute; bottom: 30px; width: 10px; height: 54px; border-radius: 6px; background: #2fa36f; border: 2px solid var(--plum); transform-origin: bottom; animation: weed 3s ease-in-out infinite alternate; opacity: .8; }
+.cd-weed.w1 { left: 3%; } .cd-weed.w2 { right: 3%; height: 40px; animation-delay: -1.4s; }
+@keyframes weed { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+
+/* ── Seahorse Derby ────────────────────────────────────────────── */
+.derby { display: flex; flex-direction: column; gap: 10px; }
+.derby-track { position: relative; border: 4px solid var(--plum); border-radius: 18px; overflow: hidden; background: linear-gradient(#7fe9f0, #2fb5c4); box-shadow: 0 4px 0 var(--plum); }
+.lane { position: relative; height: 42px; border-top: 2px dashed rgba(255,255,255,.55); }
+.lane:first-child { border-top: 0; }
+.lane.mine { background: rgba(255,226,122,.35); }
+.lane.won { background: rgba(255,255,255,.5); }
+.racer { position: absolute; top: 4px; width: 34px; height: 34px; }
+.racer i { position: absolute; left: 8px; top: 6px; width: 18px; height: 24px; border-radius: 50% 50% 45% 45%; background: var(--c); border: 3px solid var(--plum); animation: bob-r .5s ease-in-out infinite alternate; }
+.racer i::before { content: ''; position: absolute; right: -11px; top: -2px; width: 14px; height: 9px; border-radius: 0 8px 8px 0; background: var(--c); border: 3px solid var(--plum); border-left: 0; }
+.racer i::after { content: ''; position: absolute; left: 3px; top: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--plum); box-shadow: 0 16px 0 -1px rgba(255,255,255,.6); }
+@keyframes bob-r { to { transform: translateY(-3px) rotate(6deg); } }
+.place { position: absolute; right: 16%; top: 9px; font: 700 13px var(--font); font-style: normal; background: #fff; border: 2px solid var(--plum); border-radius: 8px; padding: 0 6px; }
+.lane.won .place { background: var(--gold); }
+.finish { position: absolute; top: 0; bottom: 0; right: 8%; width: 10px; background: repeating-linear-gradient(#fff 0 8px, var(--plum) 8px 16px); opacity: .9; }
+.derby-card { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.runner { border: 3px solid var(--plum); border-radius: 14px; background: #fff; padding: 6px 2px; display: flex; flex-direction: column; align-items: center; gap: 1px; box-shadow: 0 3px 0 var(--plum); min-width: 0; }
+.runner .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--c); border: 2px solid var(--plum); }
+.runner b { font: 600 12px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.runner small { font-size: 10px; font-weight: 800; color: var(--muted); }
+.runner em { font: 700 14px var(--font); font-style: normal; }
+.runner.on { background: linear-gradient(#fff3b0, var(--gold)); transform: translateY(-3px); box-shadow: 0 6px 0 var(--plum); }
+
+/* ── Ice Fishing ───────────────────────────────────────────────── */
+.ice { display: flex; flex-direction: column; gap: 10px; }
+.holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hole { position: relative; border: 3px solid var(--plum); border-radius: 16px; background: linear-gradient(#ffffff, #e2f2fc); padding: 8px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: 0 4px 0 var(--plum); }
+.hole .water { width: 46px; height: 18px; border-radius: 50%; border: 3px solid var(--plum); background: radial-gradient(ellipse, #3f8fb8, #1d4e6b); }
+.hole.h-deep .water { background: radial-gradient(ellipse, #2c6f9e, #12324a); }
+.hole.h-abyss .water { background: radial-gradient(ellipse, #3b2a7a, #0b0a1f); }
+.hole b { font: 700 15px var(--font); }
+.hole small { font-size: 10px; font-weight: 800; color: var(--muted); text-align: center; line-height: 1.25; }
+.hole em { font: 700 12px var(--font); font-style: normal; color: var(--good); }
+.hole.on { background: linear-gradient(#e0fbff, #9fe0f5); transform: translateY(-3px); box-shadow: 0 7px 0 var(--plum); }
+.pond-ice { position: relative; height: 190px; border: 4px solid var(--plum); border-radius: 20px; overflow: hidden; background: linear-gradient(#bfe6ff 0 38%, #f4fbff 38%, #dcefff); box-shadow: 0 4px 0 var(--plum); }
+.pond-ice::before { content: ''; position: absolute; left: 50%; top: 58%; width: 120px; height: 42px; margin-left: -60px; border-radius: 50%; border: 4px solid var(--plum); background: radial-gradient(ellipse, #3f8fb8, #1d4e6b); }
+.pond-ice.d-deep::before { background: radial-gradient(ellipse, #2c6f9e, #12324a); }
+.pond-ice.d-abyss::before { background: radial-gradient(ellipse, #4a3fa0, #0b0a1f); }
+.pond-ice .rod { position: absolute; left: 14%; top: 64%; width: 150px; height: 6px; border-radius: 4px; background: #8a5a33; border: 2px solid var(--plum); transform-origin: left center; transform: rotate(-38deg); }
+.pond-ice .line { position: absolute; left: 50%; top: 18%; width: 2px; height: 0; background: var(--plum); transition: height .6s ease-in; }
+.pond-ice .bobber { position: absolute; left: 50%; top: 18%; width: 16px; height: 16px; margin-left: -7px; border-radius: 50%; background: linear-gradient(#ff5b6e 50%, #fff 50%); border: 2px solid var(--plum); transition: top .6s ease-in; }
+.pond-ice.cast .line, .pond-ice.bite .line { height: 50%; }
+.pond-ice.cast .bobber { top: 64%; animation: bobber 1s ease-in-out .6s infinite alternate; }
+.pond-ice.bite .bobber { top: 70%; animation: bite .15s ease-in-out infinite alternate; }
+.pond-ice.reel .line { height: 8%; transition: height .9s ease-out; }
+.pond-ice.reel .bobber { top: 24%; transition: top .9s ease-out; }
+@keyframes bobber { to { transform: translateY(4px); } }
+@keyframes bite { to { transform: translateY(6px) scale(.9); } }
+.catch { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 12px; border: 3px solid var(--plum);
+  border-radius: 16px; background: #fff; box-shadow: 0 4px 0 var(--plum); animation: rise .5s cubic-bezier(.3,1.6,.5,1) both; z-index: 2; }
+.catch span { font-size: 40px; line-height: 1; animation: flop .4s ease-in-out infinite alternate; }
+.catch b { font: 700 14px var(--font); }
+.catch em { font: 700 15px var(--font); font-style: normal; background: var(--gold); border: 2px solid var(--plum); border-radius: 9px; padding: 0 7px; }
+.catch.good { background: linear-gradient(#fffbe6, #fff0b0); }
+@keyframes flop { to { transform: rotate(14deg) translateY(-3px); } }
+.flake { position: absolute; top: -10px; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 4px #9fd8ee; animation: snow 5s linear infinite; }
+.flake.f1 { left: 20%; } .flake.f2 { left: 60%; animation-delay: -2s; animation-duration: 6s; } .flake.f3 { left: 85%; animation-delay: -3.5s; }
+@keyframes snow { to { transform: translate(-20px, 210px); } }
+
+/* ── Ice Vault ─────────────────────────────────────────────────── */
+.vault { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.vault-door { position: relative; width: min(360px, 100%); padding: 16px 12px 10px; border: 4px solid var(--plum); border-radius: 26px;
+  background: radial-gradient(circle at 50% 40%, #e6f7ff, #a9def5 60%, #6fa9d6); box-shadow: inset 0 0 0 6px rgba(255,255,255,.5), 0 5px 0 var(--plum); transition: transform .6s, box-shadow .6s; }
+.vault.open .vault-door { box-shadow: inset 0 0 0 6px rgba(255,255,255,.5), 0 5px 0 var(--plum), 0 0 40px 10px #ffe27a; transform: scale(1.03); }
+.dials { display: flex; justify-content: center; gap: 12px; }
+.dial { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.dial button { width: 44px; height: 30px; border: 3px solid var(--plum); border-radius: 10px; background: #fff; font-size: 13px; box-shadow: 0 3px 0 var(--plum); }
+.dial button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--plum); }
+.digits { width: 62px; border: 4px solid var(--plum); border-radius: 16px; overflow: hidden; background: #2c3a5e; display: flex; flex-direction: column; }
+.digits b { display: block; text-align: center; font: 700 30px var(--font); color: #fff; padding: 4px 0; background: #3e4f80; border-bottom: 3px solid var(--plum); }
+.digits .theirs { position: relative; display: block; height: 40px; overflow: hidden; text-align: center; font: 700 26px/40px var(--font); color: #9fd8ee; }
+.digits .roll { position: absolute; left: 0; right: 0; top: 0; font-style: normal; writing-mode: vertical-lr; text-orientation: upright; letter-spacing: 0; line-height: 62px; animation: roll .45s linear infinite; }
+@keyframes roll { from { transform: translateY(0); } to { transform: translateY(-75%); } }
+.dial.right .digits { border-color: var(--good); box-shadow: 0 0 0 3px #b6f2cf; }
+.dial.right .theirs { color: #5fffb0; }
+.dial.wrong .theirs { color: #ff9bab; }
+.vault-key { margin: 8px 0 0; text-align: center; font-size: 11px; font-weight: 800; color: var(--plum-2); }
+.vault-pays { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.vault-pays span { border: 2px solid var(--plum); border-radius: 12px; padding: 3px 10px; background: #fff; font-weight: 800; font-size: 13px; }
+.vault-pays span.hit { background: var(--gold); }
+
+/* ── Star Keno ─────────────────────────────────────────────────── */
+.keno { display: grid; grid-template-columns: 1fr 150px; gap: 10px; align-items: start; }
+@media (max-width: 460px) { .keno { grid-template-columns: 1fr; } }
+.sky-grid { position: relative; display: grid; gap: 6px; padding: 10px; border: 4px solid var(--plum); border-radius: 20px;
+  background: radial-gradient(circle at 30% 20%, #4a3fa0, #1d1747 70%); box-shadow: 0 5px 0 var(--plum); }
+.sky-grid::before { content: ''; position: absolute; inset: 0; border-radius: 16px; background: radial-gradient(circle, rgba(255,255,255,.7) 1px, transparent 1.5px) 0 0 / 34px 34px; opacity: .5; pointer-events: none; }
+.star { position: relative; aspect-ratio: 1; border: 2px solid rgba(255,255,255,.25); border-radius: 14px; background: rgba(255,255,255,.06); color: #8c86c8; font-size: 26px; display: grid; place-items: center; }
+.star span { transition: transform .2s; }
+.star.mine { border-color: var(--gold); background: rgba(255,210,63,.18); color: #ffe27a; }
+.star.mine span { transform: scale(1.15); }
+.star.fell { background: rgba(127,214,255,.35); color: #e8f7ff; }
+.star.hit { background: radial-gradient(circle, #fff3b0, var(--gold) 70%); color: #fff; border-color: #fff; animation: pop .4s cubic-bezier(.3,1.8,.5,1); box-shadow: 0 0 18px #ffe27a; }
+.comet { position: absolute; left: 105%; top: -10%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #fff; box-shadow: 0 0 16px 6px #fff3b0; z-index: 3;
+  animation: comet .55s cubic-bezier(.5,0,.8,.6) forwards; }
+.comet::after { content: ''; position: absolute; left: 6px; top: 4px; width: 70px; height: 8px; border-radius: 6px; background: linear-gradient(90deg, rgba(255,243,176,.9), transparent); transform-origin: left center; transform: rotate(-35deg); }
+@keyframes comet { to { left: var(--tx); top: var(--ty); } }
+.keno-pays { display: flex; flex-direction: column; gap: 5px; }
+.keno-pays h4 { margin: 0 0 2px; font: 700 14px var(--font); }
+.keno-pays span { border: 2px solid var(--plum); border-radius: 12px; padding: 4px 10px; background: #fff; font-weight: 800; font-size: 13px; display: flex; justify-content: space-between; }
+.keno-pays span.hit { background: var(--gold); }
+
+/* ── Oracle's Chests ───────────────────────────────────────────── */
+.oracle { display: flex; flex-direction: column; gap: 12px; align-items: center; padding-top: 4px; }
+.seer { display: flex; align-items: center; gap: 10px; max-width: 460px; }
+.seer .orb { font-size: 44px; filter: drop-shadow(0 0 14px #c08cff); animation: bob .9s ease-in-out infinite alternate; }
+.seer p { margin: 0; padding: 8px 12px; border: 3px solid var(--plum); border-radius: 16px 16px 16px 4px; background: #f4ecff; font-weight: 800; font-size: 14px; line-height: 1.35; }
+.oracle.asking .seer p { background: #fff3b0; }
+.chests { display: flex; gap: 12px; justify-content: center; width: 100%; }
+.chest-b { position: relative; width: 30%; max-width: 130px; aspect-ratio: 1 / 1.05; border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.chest-b .box { width: 100%; height: 56%; border: 4px solid var(--plum); border-radius: 10px; background: linear-gradient(#b07a45, #8a5a33); position: relative; box-shadow: 0 5px 0 var(--plum); }
+.chest-b .box::after { content: ''; position: absolute; left: 50%; top: -4px; width: 18px; height: 22px; margin-left: -9px; border: 3px solid var(--plum); border-radius: 5px; background: var(--gold); }
+.chest-b .lid { position: absolute; left: 0; right: 0; bottom: calc(56% - 6px); height: 30%; border: 4px solid var(--plum); border-radius: 40px 40px 6px 6px; background: linear-gradient(#c98b4f, #9a6a3b); transform-origin: 8% 100%; transition: transform .5s cubic-bezier(.3,1.5,.5,1); z-index: 2; }
+.chest-b .inside { position: absolute; left: 0; right: 0; bottom: 46%; text-align: center; font-size: 30px; opacity: 0; transition: opacity .3s .2s, transform .5s .2s; z-index: 1; }
+.chest-b small { position: absolute; left: -10%; right: -10%; bottom: -26px; text-align: center; font: 700 12px var(--font); color: var(--plum-2); }
+.chest-b.mine .box { box-shadow: 0 5px 0 var(--plum), 0 0 0 4px var(--gold); }
+.chest-b.open .lid { transform: rotate(-70deg); }
+.chest-b.open .inside { opacity: 1; transform: translateY(-14px); }
+.chest-b.gold .box { background: linear-gradient(#ffe066, #f2b62a); }
+.chest-b:hover:not(:disabled) .lid { transform: rotate(-8deg); }
+.chests { margin-bottom: 26px; }
+.oracle-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.oracle-actions .btn { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 16px; padding: 10px 8px; }
+.oracle-actions small { font: 700 11px var(--body); opacity: .9; }
+
+/* ── The Island Hopper ─────────────────────────────────────────── */
+.ferry-back { position: absolute; inset: 0; z-index: 52; display: grid; place-items: center; padding: 12px; background: rgba(13,40,66,.55); animation: fade .25s both; }
+.ferry-chart { width: min(460px, 100%); max-height: calc(100vh - 24px); overflow: auto; border: 4px solid var(--plum); border-radius: 26px; padding: 14px 14px 16px; text-align: center;
+  background: radial-gradient(circle at 20% 15%, rgba(255,255,255,.6), transparent 40%), linear-gradient(#fff3d6, #f2dcae); box-shadow: 0 8px 0 var(--plum), 0 30px 60px rgba(0,0,0,.4); animation: spring .45s cubic-bezier(.3,1.5,.5,1) both; }
+.ferry-chart header h2 { margin: 0; font: 700 26px var(--font); color: #2ea7e8; text-shadow: 0 2px 0 var(--plum); -webkit-text-stroke: 1px var(--plum); }
+.ferry-chart header p { margin: 4px 0 10px; font-weight: 800; color: var(--plum-2); }
+.ferry-chart ul { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.route { width: 100%; display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; text-align: left; border: 3px solid var(--plum); border-radius: 16px; background: #fff; padding: 8px 12px; box-shadow: 0 4px 0 var(--plum); }
+.route:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--plum); }
+.route .ri { font-size: 28px; }
+.route .rt b { display: block; font: 700 17px var(--font); }
+.route .rt small { color: var(--muted); font-weight: 800; font-size: 12px; }
+.route .rs { font: 700 14px var(--font); color: #2ea7e8; white-space: nowrap; }
+.route.here { background: #e3f6ff; }
+.route.here .rs { color: var(--muted); }
+.route.locked { opacity: .65; filter: grayscale(.5); box-shadow: 0 2px 0 var(--plum); }
+.route.locked .rs { color: var(--plum-2); }
+.voyage { position: absolute; inset: 0; z-index: 52; overflow: hidden; background: linear-gradient(#7fd6ff, #c9f0ff 60%); animation: fade .3s both; }
+.voyage.air { background: linear-gradient(#5fa8e8, #c9ecff 70%, #fff1f8); }
+.v-sea { position: absolute; left: -20%; right: -20%; bottom: 0; height: 42%; background: repeating-linear-gradient(170deg, #2ea7e8 0 26px, #45cbdc 26px 52px); border-top: 5px solid #fff; animation: waves 1.4s linear infinite; }
+@keyframes waves { to { background-position: 120px 0; } }
+.v-craft { position: absolute; left: -20%; bottom: 34%; font-size: clamp(80px, 16vw, 140px); animation: sail 2.4s cubic-bezier(.4,.1,.5,1) forwards, rock .6s ease-in-out infinite alternate; filter: drop-shadow(0 6px 0 rgba(44,29,63,.25)); }
+.voyage.air .v-craft { bottom: 10%; animation: drift-up 2.4s cubic-bezier(.4,.1,.5,1) forwards, rock 1s ease-in-out infinite alternate; }
+@keyframes sail { to { left: 110%; } }
+@keyframes drift-up { 0% { left: 10%; bottom: -20%; } 100% { left: 80%; bottom: 110%; } }
+@keyframes rock { from { transform: rotate(-4deg); } to { transform: rotate(4deg) translateY(-6px); } }
+.v-sky { position: absolute; inset: 0; }
+.v-cloud { position: absolute; width: 160px; height: 50px; border-radius: 30px; background: #fff; opacity: .9; animation: cloud 3s linear infinite; }
+.v-cloud::before, .v-cloud::after { content: ''; position: absolute; border-radius: 50%; background: #fff; }
+.v-cloud::before { left: 24px; top: -26px; width: 64px; height: 64px; } .v-cloud::after { left: 76px; top: -16px; width: 50px; height: 50px; }
+.v-cloud.c1 { top: 12%; left: 70%; } .v-cloud.c2 { top: 28%; left: 20%; animation-duration: 4s; transform: scale(.7); } .v-cloud.c3 { top: 50%; left: 90%; animation-duration: 2.4s; }
+@keyframes cloud { to { translate: -400px 0; } }
+.v-caption { position: absolute; left: 0; right: 0; top: 42%; margin: 0; text-align: center; font: 700 clamp(22px, 5vw, 32px) var(--font); color: #fff; text-shadow: 0 3px 0 var(--plum); -webkit-text-stroke: 1.5px var(--plum); }
+
+/* ── Secrets ───────────────────────────────────────────────────── */
+.secret-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.secret { border: 3px solid var(--plum); border-radius: 16px; background: #f4ecff; padding: 10px; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 3px 0 var(--plum); }
+.secret .si { font-size: 28px; }
+.secret b { font: 700 15px var(--font); }
+.secret small { font-size: 11px; font-weight: 800; color: var(--purple); }
+.secret p { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.35; }
+.secret.found { background: linear-gradient(#fffbe6, #fff0b0); }
+.secret.found p { color: var(--good); }

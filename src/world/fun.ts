@@ -26,6 +26,8 @@ interface Particle {
   vanish?: boolean;
   wander?: number;
   fadeIn?: boolean;
+  /** Point along its velocity (a leaping dolphin). */
+  align?: boolean;
 }
 
 export class Particles {
@@ -130,6 +132,65 @@ export class Particles {
     }
   }
 
+  /** A dolphin leaping in an arc from (x, y) towards dir (±1), with a splash at each end. */
+  dolphin(x: number, y: number, dir: number) {
+    const g = new Graphics();
+    const X = (v: number) => v * dir;
+    g.poly([X(-22), 0, X(-38), -10, X(-35), 10]).fill(0x5d97c9).stroke({ width: 2.5, color: OUT });
+    g.ellipse(0, 0, 27, 10).fill(0x6fa8d6).stroke({ width: 2.5, color: OUT });
+    g.ellipse(X(4), 4, 17, 4).fill(0xdbefff);
+    g.poly([X(-2), -8, X(-10), -20, X(8), -9]).fill(0x5d97c9).stroke({ width: 2.5, color: OUT });
+    g.circle(X(15), -2, 1.9).fill(OUT);
+    g.moveTo(X(19), 3).lineTo(X(26), 2).stroke({ width: 1.5, color: OUT });
+    this.splash(x, y);
+    this.add(g, { x, y, vx: dir * 200, vy: -440, gravity: 640, life: 1.7, grow: 0, spin: 0, ground: y + 1, vanish: true, align: true, onLand: (lx, ly) => this.splash(lx, ly) });
+  }
+
+  /** Bubbles rising from (x, y). */
+  bubbles(x: number, y: number, n: number) {
+    for (let i = 0; i < n; i++) {
+      const g = new Graphics();
+      const r = 3 + Math.random() * 6;
+      g.circle(0, 0, r).stroke({ width: 2, color: 0xffffff, alpha: 0.9 }).circle(-r * 0.35, -r * 0.35, r * 0.25).fill({ color: 0xffffff, alpha: 0.8 });
+      this.add(g, { x: x + (Math.random() - 0.5) * 120, y: y - Math.random() * 40, vx: 0, vy: -50 - Math.random() * 50, gravity: -20, life: 2 + Math.random() * 1.5, grow: 0.3, spin: 0, wander: Math.random() * 10 });
+    }
+  }
+
+  /** A burst of snow (or stardust) from (x, y). */
+  burst(x: number, y: number, n: number, color = 0xffffff) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = 80 + Math.random() * 220;
+      const g = new Graphics();
+      g.circle(0, 0, 2 + Math.random() * 3).fill({ color, alpha: 0.95 });
+      g.blendMode = 'add';
+      this.add(g, { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, gravity: 160, life: 1.2 + Math.random() * 0.8, grow: -0.4, spin: 0 });
+    }
+  }
+
+  /** A twinkling star that fades where it is (a sparkle trail). */
+  sparkle(x: number, y: number, color: number) {
+    const g = new Graphics();
+    g.star(0, 0, 4, 8, 3).fill(color);
+    g.blendMode = 'add';
+    this.add(g, { x, y, vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 30, gravity: 0, life: 0.9, grow: -0.6, spin: 3 });
+  }
+
+  /** A lightning bolt from (x, top) down to (x, bottom), gone in a blink. */
+  bolt(x: number, top: number, bottom: number) {
+    const g = new Graphics();
+    const pts: number[] = [0, 0];
+    let cx = 0;
+    const steps = 9;
+    for (let i = 1; i <= steps; i++) {
+      cx += (Math.random() - 0.5) * 60;
+      pts.push(cx, ((bottom - top) * i) / steps);
+    }
+    g.poly(pts, false).stroke({ width: 14, color: 0xb9d4ff, alpha: 0.35, join: 'round' });
+    g.poly(pts, false).stroke({ width: 5, color: 0xffffff, join: 'round' });
+    g.blendMode = 'add';
+    this.add(g, { x, y: top, vx: 0, vy: 0, gravity: 0, life: 0.35, grow: 0, spin: 0 });
+  }
+
   update(dt: number, t: number) {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
@@ -158,7 +219,8 @@ export class Particles {
       }
       const k = 1 - p.life / p.max;
       p.g.position.set(p.x, p.y);
-      p.g.rotation += p.spin * dt;
+      if (p.align) p.g.rotation = Math.atan2(p.vy, Math.abs(p.vx)) * Math.sign(p.vx || 1);
+      else p.g.rotation += p.spin * dt;
       p.g.scale.set(Math.max(0.05, 1 + p.grow * k));
       p.g.alpha = Math.max(0, Math.min(1, p.life / Math.min(0.6, p.max * 0.4), p.fadeIn ? (p.max - p.life) * 2 : 1));
       if (p.life <= 0) {
@@ -259,4 +321,92 @@ export class Ambient {
       }
     }
   }
+}
+
+// ── Weather for the isles ───────────────────────────────────────────────
+
+/** Frost Isle's snowfall: flakes drifting down through the camera's view (wrapped round it as it moves). */
+export class Snowfall {
+  readonly layer = new Container();
+  private flakes: { g: Graphics; x: number; y: number; vy: number; sway: number; phase: number }[] = [];
+
+  constructor(private view: () => { x: number; y: number; w: number; h: number }, n = 110) {
+    const v = view();
+    for (let i = 0; i < n; i++) {
+      const g = new Graphics();
+      const r = 1.6 + Math.random() * 2.6;
+      g.circle(0, 0, r).fill({ color: 0xffffff, alpha: 0.75 + Math.random() * 0.25 });
+      this.layer.addChild(g);
+      this.flakes.push({ g, x: v.x + (Math.random() - 0.5) * v.w, y: v.y + (Math.random() - 0.5) * v.h, vy: 30 + r * 14, sway: 10 + Math.random() * 20, phase: Math.random() * 6 });
+    }
+  }
+
+  update(dt: number, t: number) {
+    const v = this.view();
+    const left = v.x - v.w / 2 - 40, right = v.x + v.w / 2 + 40, top = v.y - v.h / 2 - 40, bottom = v.y + v.h / 2 + 40;
+    for (const f of this.flakes) {
+      f.y += f.vy * dt;
+      f.x += Math.sin(t * 0.9 + f.phase) * f.sway * dt;
+      if (f.y > bottom) { f.y = top; f.x = left + Math.random() * (right - left); }
+      if (f.y < top) f.y = bottom;
+      if (f.x < left) f.x += right - left;
+      if (f.x > right) f.x -= right - left;
+      f.g.position.set(f.x, f.y);
+    }
+  }
+}
+
+/**
+ * The Sky Kingdom's sky: a gradient behind everything, a sea of clouds drifting below the floating islands, and a few
+ * wisps drifting over them. Coordinates are world pixels within the map's bounds.
+ */
+export class CloudSea {
+  readonly backdrop = new Graphics();
+  readonly below = new Container();
+  readonly above = new Container();
+  private clouds: { c: Container; vx: number }[] = [];
+
+  constructor(private b: { minX: number; maxX: number; minY: number; maxY: number }) {
+    const w = b.maxX - b.minX, h = b.maxY - b.minY;
+    // The gradient: deep blue at the top to pale near the cloud sea.
+    const top = [0x5fa8e8, 0x8fd3ff, 0xc9ecff, 0xfff1f8];
+    const bands = 24;
+    for (let i = 0; i < bands; i++) {
+      const f = i / (bands - 1);
+      const seg = Math.min(top.length - 2, Math.floor(f * (top.length - 1)));
+      const k = f * (top.length - 1) - seg;
+      this.backdrop.rect(b.minX - 2000, b.minY - 1500 + ((h + 3000) * i) / bands, w + 4000, (h + 3000) / bands + 2).fill(mix(top[seg], top[seg + 1], k));
+    }
+    for (let i = 0; i < 34; i++) this.puff(this.below, b.minX + Math.random() * w, b.minY + h * (0.15 + Math.random() * 0.95), 0.8 + Math.random() * 1.2, 0.9);
+    // A few thin wisps drift over everything, along the top and bottom so they never hide the islands for long.
+    for (let i = 0; i < 4; i++) this.puff(this.above, b.minX + Math.random() * w, b.minY + (i % 2 ? h * (0.92 + Math.random() * 0.1) : h * Math.random() * 0.08), 0.7 + Math.random() * 0.5, 0.28);
+  }
+
+  private puff(layer: Container, x: number, y: number, s: number, alpha: number) {
+    const c = new Container();
+    const g = new Graphics();
+    const blobs: [number, number, number][] = [[-60, 0, 40], [-20, -18, 50], [30, -10, 46], [70, 4, 34], [0, 10, 44]];
+    for (const [bx, by, r] of blobs) g.circle(bx, by + 12, r).fill({ color: 0xc9dcf2, alpha });
+    for (const [bx, by, r] of blobs) g.circle(bx, by, r).fill({ color: 0xffffff, alpha });
+    c.addChild(g);
+    c.position.set(x, y);
+    c.scale.set(s);
+    layer.addChild(c);
+    this.clouds.push({ c, vx: (6 + Math.random() * 12) * (Math.random() < 0.5 ? -1 : 1) });
+  }
+
+  update(dt: number) {
+    const { minX, maxX } = this.b;
+    for (const k of this.clouds) {
+      k.c.x += k.vx * dt;
+      if (k.c.x > maxX + 300) k.c.x = minX - 300;
+      if (k.c.x < minX - 300) k.c.x = maxX + 300;
+    }
+  }
+}
+
+function mix(a: number, b: number, k: number) {
+  const ch = (c: number, s: number) => (c >> s) & 255;
+  const m = (s: number) => Math.round(ch(a, s) + (ch(b, s) - ch(a, s)) * k) << s;
+  return m(16) | m(8) | m(0);
 }

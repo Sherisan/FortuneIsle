@@ -3,21 +3,35 @@ import type { Cosmetic, GameKey, ZoneKey } from '../api/types.ts';
 import { Paytable } from '../games/Paytable.tsx';
 import { money, useGame, type Panel } from '../store/game.ts';
 import { Promotions } from './Promotions.tsx';
+import { SECRETS } from './secrets.ts';
 import { sound } from './sound.ts';
 import { world } from '../world/WorldView.tsx';
 
 export const GAME_ICON: Record<GameKey, string> = {
   'coconut-shy': '🥥', 'cup-shuffle': '🥤', 'scratch-kiosk': '🎟️', 'prize-wheel': '🎡', 'duck-pond': '🦆', 'high-striker': '🔨',
   roulette: '🎰', 'temple-doors': '🚪', 'lava-crash': '🌋', 'island-reels': '🍒', 'dragon-tiger': '🐉', 'pirate-dice': '🎲',
+  'diamond-wheel': '💎', 'coral-drop': '🐚', 'seahorse-derby': '🐠', 'ice-fishing': '🎣', 'ice-vault': '🔐', 'star-keno': '🌠', 'oracle-chests': '🔮',
 };
-const ZONE_ICON: Record<ZoneKey, string> = { harbour: '⚓', boardwalk: '🏖️', fairground: '🎪', casino: '🎰', jungle: '🌴', volcano: '🌋', vip: '💎' };
+const ZONE_ICON: Record<ZoneKey, string> = {
+  harbour: '⚓', boardwalk: '🏖️', fairground: '🎪', casino: '🎰', jungle: '🌴', volcano: '🌋', vip: '💎', lagoon: '🐚', frost: '❄️', sky: '☁️',
+};
 /** Games played indoors: where to find them. */
-const INDOORS: Partial<Record<GameKey, string>> = { roulette: 'inside the casino', 'island-reels': 'inside the casino', 'dragon-tiger': 'inside the casino', 'pirate-dice': 'in the Rusty Anchor tavern' };
+const INDOORS: Partial<Record<GameKey, string>> = {
+  roulette: 'inside the casino', 'island-reels': 'inside the casino', 'dragon-tiger': 'inside the casino', 'pirate-dice': 'in the Rusty Anchor tavern',
+  'diamond-wheel': 'upstairs in the casino',
+};
+/** The isles: how to get there. */
+const ISLE_NOTE: Partial<Record<ZoneKey, string>> = {
+  lagoon: 'An atoll a short sail away — take the Island Hopper from the end of the Harbour pier.',
+  frost: 'Snow, ice and northern lights, on the Island Hopper from the Harbour pier.',
+  sky: 'Floating islands above the clouds — the Sky Ferry flies from the Harbour pier.',
+};
 const COSMETIC_ICON: Record<string, string> = {
   'hat-none': '🚫', 'hat-straw': '👒', 'hat-sailor': '⚓', 'hat-pirate': '🏴‍☠️', 'hat-flower': '🌺', 'hat-crown': '👑',
   'outfit-tee': '👕', 'outfit-hawaiian': '🌴', 'outfit-sailor': '🧑‍✈️', 'outfit-tux': '🤵', 'outfit-explorer': '🧭', 'outfit-gold': '✨',
   'pet-none': '🚫', 'pet-crab': '🦀', 'pet-turtle': '🐢', 'pet-monkey': '🐒', 'pet-penguin': '🐧',
-  'fx-confetti': '🎉', 'fx-coins': '🪙', 'fx-fireworks': '🎆', 'fx-hearts': '💖',
+  'fx-confetti': '🎉', 'fx-coins': '🪙', 'fx-fireworks': '🎆', 'fx-hearts': '💖', 'fx-stars': '🌠',
+  'hat-snorkel': '🤿', 'outfit-parka': '🧥',
 };
 
 export function Panels() {
@@ -31,6 +45,7 @@ export function Panels() {
   const titles: Record<Exclude<Panel, null>, string> = {
     menu: 'Menu', wardrobe: 'Wardrobe', history: 'Cashier & history', rg: 'Responsible gambling', fair: 'Provably fair',
     board: 'Island notice board', travel: 'Fast travel', paytables: 'Paytables & rules', promos: 'Promotions',
+    secrets: 'Secrets of the isles',
   };
   return (
     <div className="sheet-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
@@ -49,6 +64,7 @@ export function Panels() {
           {panel === 'travel' && <Travel />}
           {panel === 'paytables' && <Paytables />}
           {panel === 'promos' && <Promotions />}
+          {panel === 'secrets' && <Secrets />}
         </div>
       </div>
     </div>
@@ -69,6 +85,7 @@ function Menu() {
     </button>
   );
   const promoCount = useGame((s) => (s.promos?.promotions.length ?? 0) + (s.promos?.freeBets.length ?? 0));
+  const found = useGame((s) => s.secrets.length);
   return (
     <div className="menu-list">
       {item('🎁', 'Promotions', () => setPanel('promos'), promoCount ? 'Free plays, races, leaderboards and more' : 'Nothing running right now')}
@@ -76,6 +93,7 @@ function Menu() {
       {item('🧾', 'Round history', () => setPanel('history'), 'Your recent rounds and session totals')}
       {item('🗺️', 'Fast travel', () => setPanel('travel'), 'Jump to any open zone')}
       {item('📜', 'Paytables & rules', () => setPanel('paytables'), 'Every game’s odds and rules')}
+      {item('🗝️', 'Secrets', () => setPanel('secrets'), `${found} of ${SECRETS.length} found — just for fun`)}
       {item('🔐', 'Provably fair', () => setPanel('fair'), 'Seeds and how to verify a round')}
       {item('🛡️', 'Responsible gambling', () => setPanel('rg'), 'Limits, reality checks, self-exclusion')}
       {item(muted ? '🔇' : '🔊', muted ? 'Sound: off' : 'Sound: on', toggleMute)}
@@ -274,7 +292,12 @@ function Board() {
               ))}
               {z.key === 'vip' && (
                 <li>
-                  <span>Upstairs in the Grand Casino: golden reels, private roulette and Dragon Tiger — same odds, more sparkle.</span>
+                  <span>Upstairs in the Grand Casino — plus golden reels, private roulette and Dragon Tiger.</span>
+                </li>
+              )}
+              {ISLE_NOTE[z.key] && (
+                <li>
+                  <span>{ISLE_NOTE[z.key]}</span>
                 </li>
               )}
             </ul>
@@ -340,5 +363,30 @@ export function Section({ title, children }: { title: string; children: ReactNod
       <h3>{title}</h3>
       {children}
     </section>
+  );
+}
+
+/** The secrets log: found ones say what they were; hidden ones give a hint. Just for fun — they never touch money or odds. */
+function Secrets() {
+  const found = useGame((s) => s.secrets);
+  return (
+    <div className="secrets">
+      <p className="hint">
+        {found.length === SECRETS.length ? '🏆 You found every secret. A true island explorer!' : `${found.length} of ${SECRETS.length} found. Secrets are just for fun — they never change the games.`}
+      </p>
+      <div className="secret-grid">
+        {SECRETS.map((x) => {
+          const on = found.includes(x.id);
+          return (
+            <div key={x.id} className={`secret${on ? ' found' : ''}`}>
+              <span className="si">{on ? x.icon : '❔'}</span>
+              <b>{on ? x.name : '???'}</b>
+              <small>{x.where}</small>
+              <p>{on ? '✓ Found' : x.hint}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -14,8 +14,9 @@ const W = 3; // outline width
 export interface Thing {
   view: Container;
   update?: (t: number) => void;
-  /** A tap/interaction: the thing plays its little show (balloons pop, a boat sails off, the gem flares). */
-  poke?: (t: number) => void;
+  /** A tap/interaction: the thing plays its little show (balloons pop, a boat sails off, the gem flares). It returns a
+   *  secret's id when the tap reveals one (the third tap on the yeti's pine, the fifth on the moon…). */
+  poke?: (t: number) => unknown;
   /** Where a palm's crown is (for the falling coconut). */
   top?: { x: number; y: number };
 }
@@ -882,7 +883,7 @@ export function avatar(): Avatar {
 
   const draw = (look: Look) => {
     const o = look.outfit;
-    const pants = o === 'outfit-tux' ? 0x2c2c3a : o === 'outfit-gold' ? 0xc99a2e : o === 'outfit-explorer' ? 0x8c7a52 : o === 'outfit-sailor' ? 0xffffff : 0x3e6fd6;
+    const pants = o === 'outfit-tux' ? 0x2c2c3a : o === 'outfit-gold' ? 0xc99a2e : o === 'outfit-explorer' ? 0x8c7a52 : o === 'outfit-sailor' ? 0xffffff : o === 'outfit-parka' ? 0x2c4a6e : 0x3e6fd6;
     for (const leg of [legL, legR]) {
       leg.clear();
       ln(leg.roundRect(-4.5, -4, 9, 16, 4).fill(pants), 2.5);
@@ -892,6 +893,7 @@ export function avatar(): Avatar {
     legR.position.set(6, -14);
     const shirt: Record<string, number> = {
       'outfit-tee': 0xff7a59, 'outfit-hawaiian': 0x22c4b0, 'outfit-sailor': 0xffffff, 'outfit-tux': 0x2c2c3a, 'outfit-explorer': 0xc8b27a, 'outfit-gold': 0xffd23f,
+      'outfit-parka': 0x3e8ef7,
     };
     torso.clear();
     ln(torso.roundRect(-14, -36, 28, 26, 10).fill(shirt[o] ?? 0xff7a59));
@@ -900,6 +902,12 @@ export function avatar(): Avatar {
     if (o === 'outfit-tux') { torso.poly([-6, -36, 6, -36, 0, -14]).fill(0xffffff); torso.poly([-6, -34, 0, -31, -6, -28]).fill(0xff3b4e).poly([6, -34, 0, -31, 6, -28]).fill(0xff3b4e); }
     if (o === 'outfit-explorer') { torso.rect(-14, -20, 28, 4).fill(0x6b4428); torso.roundRect(-10, -32, 8, 7, 2).stroke({ width: 1.5, color: 0x6b4428 }); }
     if (o === 'outfit-gold') for (const [x, y] of [[-6, -30], [5, -22]]) torso.poly([x, y - 4, x + 1.5, y, x, y + 4, x - 1.5, y]).fill(0xffffff);
+    if (o === 'outfit-parka') {
+      // Puffy quilting, a zip, and a fur-trimmed collar.
+      for (const y of [-28, -20]) torso.moveTo(-13, y).lineTo(13, y).stroke({ width: 1.5, color: 0x2a64c0 });
+      torso.rect(-1, -34, 2, 22).fill(0xdbe9f5);
+      for (let k = 0; k < 5; k++) torso.circle(-12 + k * 6, -36, 3.6).fill(0xf4f8ff);
+    }
     gloss(torso, -6, -31, 5, 3, 0.35);
     for (const [arm, x] of [[armL, -15], [armR, 15]] as const) {
       arm.clear();
@@ -945,6 +953,15 @@ export function avatar(): Avatar {
         ln(hat.poly([-16, -12, -16, -28, -8, -20, 0, -32, 8, -20, 16, -28, 16, -12]).fill(0xffd23f));
         hat.circle(0, -18, 3).fill(0xff3b4e).circle(-9, -16, 2).fill(0x4fc3ff).circle(9, -16, 2).fill(0x5fd38a);
         gloss(hat, -6, -22, 3, 2, 0.6);
+        break;
+      case 'hat-snorkel':
+        // A mask over the eyes (drawn on the face layer's level) and a snorkel up the side.
+        ln(hat.roundRect(-17, -6, 34, 15, 7).fill({ color: 0x9fe9ff, alpha: 0.75 }), 2.5);
+        hat.rect(-21, -1, 4, 5).fill(0xff8a2a).rect(17, -1, 4, 5).fill(0xff8a2a);
+        gloss(hat, -8, -2, 5, 2, 0.7);
+        ln(hat.moveTo(20, 4).lineTo(24, -30).stroke({ width: 5, color: 0xffd23f }), 1);
+        hat.moveTo(20, 4).lineTo(24, -30).stroke({ width: 3, color: 0xffd23f, cap: 'round' });
+        ln(hat.roundRect(20, -36, 9, 8, 3).fill(0xff5b6e), 2);
         break;
     }
   };

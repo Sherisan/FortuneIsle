@@ -16,6 +16,16 @@ add('High Striker', R.expected(R.STRIKER_TABLE));
 add('Scratch Kiosk', R.expected(R.SCRATCH_TABLE));
 for (let n = 1; n <= R.TEMPLE_LEVELS; n++) add(`Temple Doors, out at ${n}`, (2 / 3) ** n * R.templeMultiplier(n));
 add('Roulette (any bet)', 36 / 37, 36 / 37);
+R.GEMS.forEach((g, i) => add(`Diamond Wheel (${g})`, (R.DIAMOND_SEGMENTS.filter((s) => s === i).length * R.GEM_PAYS[i]) / R.DIAMOND_SEGMENTS.length));
+R.CORAL_MODES.forEach((m, i) => add(`Coral Drop (${m})`, R.CORAL_POCKETS[i].reduce((s, p, k) => s + R.choose(R.CORAL_ROWS, k) * p, 0) / 2 ** R.CORAL_ROWS));
+const derbyTotal = R.DERBY_ODDS.reduce((s, x) => s + x.weight, 0);
+R.DERBY_ODDS.forEach((r) => add(`Seahorse Derby (${r.key})`, (r.multiplier * r.weight) / derbyTotal));
+R.FISHING_HOLES.forEach((h, i) => add(`Ice Fishing (${h})`, R.expected(R.FISHING_TABLES[i])));
+add('Ice Vault', R.VAULT_PAYS.reduce((s, p, k) => s + R.choose(R.VAULT_DIGITS, k) * 9 ** (R.VAULT_DIGITS - k) * p, 0) / 10 ** R.VAULT_DIGITS);
+for (let n = 1; n <= R.KENO_MAX_PICKS; n++)
+  add(`Star Keno (${n} pick${n > 1 ? 's' : ''})`, R.KENO_PAYS[n - 1].reduce((s, p, k) => s + R.choose(n, k) * R.choose(R.KENO_STARS - n, R.KENO_DRAWS - k) * p, 0) / R.choose(R.KENO_STARS, R.KENO_DRAWS));
+add('Oracle’s Chests (stay)', R.ORACLE_STAY / R.ORACLE_CHESTS);
+add('Oracle’s Chests (switch)', (R.ORACLE_SWITCH * (R.ORACLE_CHESTS - 1)) / R.ORACLE_CHESTS);
 
 const N = 2_000_000;
 for (const x of [1.01, 2, 10, 100]) {

@@ -9,13 +9,13 @@ import { idx, N, toScreen, type Cell, type Ground, type Prop, type SceneKey, typ
  *
  *   Grand Casino (casino)  the bar, two roulette tables, Island Reels slots under the big screen, Dragon Tiger at the
  *                          card tables, the table-games board, and the stairs up to the VIP Salon behind velvet ropes.
- *   VIP Salon (vip)        upstairs, level 5: a gold roulette table, Dragon Tiger, two golden reels, a piano, a champagne
- *                          tower and a window over the island at night. Same games and odds as downstairs.
+ *   VIP Salon (vip)        upstairs, level 5: its own Diamond Wheel, a gold roulette table, Dragon Tiger, golden reels, a
+ *                          piano, a champagne tower and a window over the island at night.
  *   Rusty Anchor (tavern)  the Harbour's pirate tavern: two Pirate Dice tables, the bar, a hearth, barrels and a notice
  *                          board.
  */
 
-export type InteriorKind = Exclude<SceneKey, 'island'>;
+export type InteriorKind = Extract<SceneKey, 'casino' | 'vip' | 'tavern'>;
 
 export const ROOMS: Record<InteriorKind, { x0: number; y0: number; x1: number; y1: number }> = {
   casino: { x0: 14, y0: 14, x1: 33, y1: 33 },
@@ -131,7 +131,8 @@ function buildVip(): WorldMap {
   r.spot({ id: 'vip-roulette', kind: 'game', game: 'roulette', label: 'Roulette', gx: 19, gy: 21, ax: 20, ay: 21 });
   r.spot({ id: 'vip-dragon', kind: 'game', game: 'dragon-tiger', label: 'Dragon Tiger', gx: 28, gy: 22, ax: 27, ay: 22 });
   r.spot({ id: 'vip-reels', kind: 'game', game: 'island-reels', label: 'Golden Reels', gx: 21, gy: 17, ax: 21, ay: 18 });
-  r.spot({ id: 'vip-reels-2', kind: 'game', game: 'island-reels', label: 'Golden Reels', gx: 25, gy: 17, ax: 25, ay: 18 });
+  // The salon's own game: the Diamond Wheel, a money wheel of gems.
+  r.spot({ id: 'diamond-wheel', kind: 'game', game: 'diamond-wheel', label: 'Diamond Wheel', gx: 25, gy: 17, ax: 25, ay: 18 });
   r.prop('piano', 19, 27);
   r.prop('champagne', 28, 27);
   r.prop('sofa', 30, 18);

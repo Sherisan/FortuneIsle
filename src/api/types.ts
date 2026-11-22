@@ -12,12 +12,21 @@ export type GameKey =
   | 'lava-crash'
   | 'island-reels'
   | 'dragon-tiger'
-  | 'pirate-dice';
+  | 'pirate-dice'
+  | 'diamond-wheel'
+  | 'coral-drop'
+  | 'seahorse-derby'
+  | 'ice-fishing'
+  | 'ice-vault'
+  | 'star-keno'
+  | 'oracle-chests';
 
+/** The islands of their own, one per level from 6, reached on the ferry from the Harbour pier. */
+export type IsleZone = 'lagoon' | 'frost' | 'sky';
 /** 'vip' is the VIP Salon upstairs in the Grand Casino (an interior only; it has no ground on the island). */
-export type ZoneKey = 'harbour' | 'boardwalk' | 'fairground' | 'casino' | 'jungle' | 'volcano' | 'vip';
+export type ZoneKey = 'harbour' | 'boardwalk' | 'fairground' | 'casino' | 'jungle' | 'volcano' | 'vip' | IsleZone;
 /** The zones with ground on the island map. */
-export type IslandZone = Exclude<ZoneKey, 'vip'>;
+export type IslandZone = Exclude<ZoneKey, 'vip' | IsleZone>;
 
 export interface Tier {
   key: string;
@@ -52,6 +61,13 @@ export interface Paytables {
   'island-reels': { tiers: Tier[] };
   'dragon-tiger': { ranks: number; pays: number; tie: number };
   'pirate-dice': { faces: string[]; dice: number; pays: number[] };
+  'diamond-wheel': { gems: string[]; segments: number[]; pays: number[] };
+  'coral-drop': { rows: number; modes: string[]; pockets: number[][] };
+  'seahorse-derby': { racers: string[]; odds: Tier[] };
+  'ice-fishing': { holes: string[]; tables: Tier[][] };
+  'ice-vault': { digits: number; pays: number[] };
+  'star-keno': { stars: number; draws: number; maxPicks: number; pays: number[][] };
+  'oracle-chests': { chests: number; stay: number; switch: number };
 }
 
 export interface GameMeta<K extends GameKey = GameKey> {
@@ -87,9 +103,12 @@ export interface BetBody {
   game: GameKey;
   stake: number;
   choice?: number;
-  mode?: 'classic' | 'golden';
+  /** Coconut Shy: classic | golden. Coral Drop: calm | wild. */
+  mode?: 'classic' | 'golden' | 'calm' | 'wild';
   auto?: number;
   bets?: RouletteBet[];
+  /** Star Keno: 1-4 different stars (0-15). */
+  picks?: number[];
   /** Play one of the player's free plays for this attraction (its value is the stake; roulette bets must add up to it). */
   freeBet?: boolean;
 }
@@ -235,7 +254,8 @@ export interface IslandApi {
   balance(): Promise<number>;
   state(): Promise<State>;
   bet(body: BetBody): Promise<State>;
-  action(action: 'pick' | 'cashout', door?: number): Promise<State>;
+  /** Temple Doors: pick (door) or cashout. Oracle's Chests: stay or switch. Lava Crash: cashout. */
+  action(action: 'pick' | 'cashout' | 'stay' | 'switch', door?: number): Promise<State>;
   watch(): Promise<State>;
   seed(clientSeed: string): Promise<State>;
   equip(id: string): Promise<State>;

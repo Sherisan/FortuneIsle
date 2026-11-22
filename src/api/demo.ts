@@ -5,7 +5,7 @@ import { ApiError, type BetBody, type FreePlay, type GameKey, type HistoryEntry,
 /*
  * Offline demo engine (?demo or VITE_DEMO=1): the same rules as IslandService, played in the browser with
  * crypto.getRandomValues and fun money. Not provably fair (no committed seed) — the real game is.
- * ?unlock starts at level 6 with every zone open.
+ * ?unlock starts at the top zone level (8) with every zone open.
  */
 
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
@@ -32,14 +32,16 @@ interface DemoRound extends RoundView {
   /** The free play this round uses (promotions pay it), or null. */
   freePlay: FreePlay | null;
   golden: boolean;
+  /** Oracle's Chests: the first pick, the treasure and the chest the Oracle opened. */
+  oracle: { pick: number; treasure: number; opened: number } | null;
 }
 
 export function createDemoApi(): IslandApi {
   const unlock = new URLSearchParams(location.search).has('unlock');
   let balance = 10000;
-  let xp = unlock ? R.xpFor(6) : 0;
+  let xp = unlock ? R.xpFor(R.TOP_LEVEL) : 0;
   let keys = unlock ? 3 : 0;
-  const owned = new Set(R.COSMETICS.filter((c) => c.level === 1 || (unlock && c.level > 0 && c.level <= 6)).map((c) => c.id));
+  const owned = new Set(R.COSMETICS.filter((c) => c.level === 1 || (unlock && c.level > 0 && c.level <= R.TOP_LEVEL)).map((c) => c.id));
   const equipped = { hat: 'hat-straw', outfit: 'outfit-tee', pet: 'pet-none', effect: 'fx-confetti' } as State['player']['equipped'];
   let lastDaily = '';
   let nonce = 0;
@@ -69,6 +71,13 @@ export function createDemoApi(): IslandApi {
       case 'island-reels': return m === Math.max(...R.REELS_TABLE.map((t) => t.multiplier));
       case 'dragon-tiger': return m === R.DT_TIE;
       case 'pirate-dice': return m === R.DICE_PAYS[R.DICE_PAYS.length - 1];
+      case 'diamond-wheel': return m === R.GEM_PAYS[R.GEM_PAYS.length - 1];
+      case 'coral-drop': return m === Math.max(...R.CORAL_POCKETS[r.choice?.mode === 'wild' ? 1 : 0]);
+      case 'seahorse-derby': return m === R.DERBY_ODDS[R.DERBY_ODDS.length - 1].multiplier;
+      case 'ice-fishing': return m === Math.max(...R.FISHING_TABLES[Math.max(0, R.FISHING_HOLES.indexOf(r.choice?.hole))].map((t) => t.multiplier));
+      case 'ice-vault': return m === R.VAULT_PAYS[R.VAULT_PAYS.length - 1];
+      case 'star-keno': return (r.choice?.picks?.length ?? 0) >= 3 && r.outcome?.hits === r.choice.picks.length;
+      case 'oracle-chests': return r.choice?.decision === 'stay';
     }
   };
 
@@ -84,8 +93,8 @@ export function createDemoApi(): IslandApi {
 
   const view = (r: DemoRound | null): RoundView | null => {
     if (!r) return null;
-    const { crash, startedAt, level: lv, picks: _p, ended: _e, end: _n, freePlay, golden: _g, ...rest } = r;
-    void _p; void _e; void _n; void _g;
+    const { crash, startedAt, level: lv, picks: _p, ended: _e, end: _n, freePlay, golden: _g, oracle: _o, ...rest } = r;
+    void _p; void _e; void _n; void _g; void _o;
     return {
       ...rest,
       free: freePlay != null,
@@ -234,6 +243,45 @@ export function createDemoApi(): IslandApi {
         const matches = dice.filter((d) => d === body.choice).length;
         return [R.DICE_PAYS[matches], { face: R.DICE_FACES[body.choice!] }, { dice: dice.map((d) => R.DICE_FACES[d]), matches }];
       }
+      case 'diamond-wheel': {
+        const gem = body.choice!;
+        const segment = pick(R.DIAMOND_SEGMENTS.length);
+        const landed = R.DIAMOND_SEGMENTS[segment];
+        return [landed === gem ? R.GEM_PAYS[gem] : 0, { gem: R.GEMS[gem] }, { segment, gem: R.GEMS[landed] }];
+      }
+      case 'coral-drop': {
+        const mode = body.mode === 'wild' ? 1 : 0;
+        const path = Array.from({ length: R.CORAL_ROWS }, () => pick(2));
+        const pocket = path.reduce((s, x) => s + x, 0);
+        return [R.CORAL_POCKETS[mode][pocket], { mode: R.CORAL_MODES[mode] }, { path, pocket }];
+      }
+      case 'seahorse-derby': {
+        const winner = weighted(R.DERBY_ODDS);
+        const rest = R.DERBY_ODDS.map((_, i) => i).filter((i) => i !== winner);
+        const order = [winner];
+        while (rest.length) order.push(rest.splice(pick(rest.length), 1)[0]);
+        return [winner === body.choice ? R.DERBY_ODDS[winner].multiplier : 0, { racer: body.choice }, { winner, order }];
+      }
+      case 'ice-fishing': {
+        const hole = body.choice!;
+        const table = R.FISHING_TABLES[hole];
+        const tier = weighted(table);
+        return [table[tier].multiplier, { hole: R.FISHING_HOLES[hole] }, { tier, fish: table[tier].key }];
+      }
+      case 'ice-vault': {
+        const c = body.choice!;
+        const dial = [Math.floor(c / 100), Math.floor(c / 10) % 10, c % 10];
+        const code = [pick(10), pick(10), pick(10)];
+        const matches = dial.filter((d, i) => d === code[i]).length;
+        return [R.VAULT_PAYS[matches], { code: dial }, { code, matches }];
+      }
+      case 'star-keno': {
+        const picks = [...(body.picks ?? [])].sort((a, b) => a - b);
+        const left = Array.from({ length: R.KENO_STARS }, (_, i) => i);
+        const stars = Array.from({ length: R.KENO_DRAWS }, () => left.splice(pick(left.length), 1)[0]);
+        const hits = picks.filter((p) => stars.includes(p)).length;
+        return [R.KENO_PAYS[picks.length - 1][hits], { picks }, { stars, hits }];
+      }
       case 'roulette': {
         const pocket = pick(37);
         const bets = body.bets ?? [];
@@ -286,10 +334,21 @@ export function createDemoApi(): IslandApi {
         id: hex(8), game: body.game, stake, choice: null, outcome: null, status: 'live', multiplier: 0, payout: 0, balance,
         winPending: false, xpGained: 0, levelUp: 0, temple: null, lava: null, serverSeed: nextSeed, clientSeed, nonce,
         crash: 0, startedAt: Date.now(), level: 0, picks: [], ended, end, freePlay, golden: body.mode === 'golden', promos: [],
+        oracle: null,
       };
       nextSeed = hex(32);
       open = r;
       if (body.game === 'temple-doors') r.outcome = { level: 0, picks: r.picks };
+      else if (body.game === 'oracle-chests') {
+        // As IslandFair.Oracle: the treasure, then an empty chest the player didn't pick.
+        const p = body.choice!;
+        const treasure = pick(R.ORACLE_CHESTS);
+        const empty = [0, 1, 2].filter((c) => c !== p && c !== treasure);
+        const opened = empty.length === 1 ? empty[0] : empty[pick(empty.length)];
+        r.oracle = { pick: p, treasure, opened };
+        r.choice = { chest: p };
+        r.outcome = { pick: p, opened };
+      }
       else if (body.game === 'lava-crash') {
         r.crash = R.lavaCrashPoint(rand());
         r.lava = { elapsedMs: 0, auto: body.auto ?? null, crash: null };
@@ -322,6 +381,15 @@ export function createDemoApi(): IslandApi {
           if (r.level === 0) return fail('Open at least one door first.', 'NOT_ALLOWED');
           settle(r, 'cashed', R.templeMultiplier(r.level));
         }
+      } else if (r.game === 'oracle-chests') {
+        if (action !== 'stay' && action !== 'switch') return fail('Oracle’s Chests takes stay or switch.', 'INVALID_ACTION');
+        const o = r.oracle!;
+        const stay = action === 'stay';
+        const final = stay ? o.pick : [0, 1, 2].find((c) => c !== o.pick && c !== o.opened)!;
+        const won = final === o.treasure;
+        r.choice = { chest: o.pick, decision: action };
+        r.outcome = { pick: o.pick, opened: o.opened, final, treasure: o.treasure };
+        settle(r, won ? 'won' : 'lost', won ? (stay ? R.ORACLE_STAY : R.ORACLE_SWITCH) : 0);
       } else {
         settle(r, 'cashed', R.lavaAt((Date.now() - r.startedAt) / 1000));
       }
