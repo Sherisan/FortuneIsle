@@ -1,4 +1,5 @@
 import { ApiError, type BetBody, type Info, type IslandApi, type LimitsBody, type PromoState, type State } from './types.ts';
+import { connectionLost, isOnline, isUnreachableStatus, startConnectionGuard } from '../net/connectionGuard.ts';
 
 /*
  * Client for FeedingFranzeeAPI's api/island (Engine `Island`, GameId `fortune-isle`, see IslandController).
@@ -35,7 +36,15 @@ async function fetchToken(): Promise<string> {
   return ((await res.json()) as { token: string }).token;
 }
 
+// Connection-loss safety (net/connectionGuard): started by the first call; its start-up recovery has the server settle
+// anything a dropped connection left open (a Temple climb, an Oracle choice, a lava run) before the island loads.
+let guard: Promise<unknown> | null = null;
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
+  guard ??= startConnectionGuard({ apiBase: API_BASE, getToken, heartbeat: true });
+  await guard;
+  // Nothing is sent (or bet) while the "Connecting to server…" panel is up.
+  if (!isOnline()) throw new ApiError('Connecting to server…');
   const auth = await getToken();
   let res: Response;
   try {
@@ -45,7 +54,12 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError('Connection lost — check your network and try again.');
+    connectionLost();
+    throw new ApiError('Connection lost — reconnecting…');
+  }
+  if (isUnreachableStatus(res.status)) {
+    connectionLost();
+    throw new ApiError('Connection lost — reconnecting…');
   }
   if (res.status === 429) throw new ApiError('Too many requests. Slow down a little.');
   if (res.status === 401) throw new ApiError('Your session has expired. Reopen the game from the lobby.', 'SESSION');

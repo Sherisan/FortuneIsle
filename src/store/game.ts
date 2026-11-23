@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createDemoApi } from '../api/demo.ts';
 import { createHttpApi } from '../api/http.ts';
+import { onRecovered } from '../net/connectionGuard.ts';
 import { ApiError, type BetBody, type FreePlay, type GameKey, type GameMeta, type Info, type IslandApi, type PromoOutcome, type PromoState, type State, type ZoneKey } from '../api/types.ts';
 import { BOTTLE_NOTE, loadSecrets, saveSecrets, SECRETS } from '../ui/secrets.ts';
 import { sound } from '../ui/sound.ts';
@@ -208,6 +209,14 @@ export const useGame = create<Store>((set, get) => ({
 
   async boot() {
     const { api } = get();
+    // Connection-loss safety: after a reconnect the server has refunded (or cashed out) any round the drop left
+    // open, so re-read the island; a game whose round was settled that way is closed.
+    if (!api.demo)
+      onRecovered(async (r) => {
+        const [balance, state] = await Promise.all([get().api.balance(), get().api.state()]);
+        set({ balance, state });
+        if (r.refunds.length > 0) get().closeGame();
+      });
     try {
       const [info, balance, state] = await Promise.all([api.info(), api.balance(), api.state()]);
       const stake = info.chips.includes(5) ? 5 : info.chips[0] ?? info.minBet;
